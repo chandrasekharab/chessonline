@@ -73,6 +73,14 @@ export default function TutorialPage() {
   const [hintSquare, setHintSquare] = useState<Square | null>(null);
   const [hintLoading, setHintLoading] = useState(false);
 
+  // Wrong-move arrow (shown after inaccuracy / mistake / blunder)
+  const [wrongMoveArrow, setWrongMoveArrow] = useState<[Square, Square] | null>(null);
+
+  // Undo history — one snapshot per player move
+  const [undoHistory, setUndoHistory] = useState<
+    Array<{ fen: string; cards: MoveCard[]; lastMove: { from: Square; to: Square } | null }>
+  >([]);
+
   // Click-to-move
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [optionSquares, setOptionSquares] = useState<Square[]>([]);
@@ -145,25 +153,43 @@ export default function TutorialPage() {
   }, []);
 
   // ── Submit a player move ──────────────────────────────────────────────────
+  const BAD_LABELS = ['inaccuracy', 'mistake', 'blunder'];
+
   const submitMove = useCallback(async (from: Square, to: Square) => {
     const uci = `${from}${to}${isPromotion(fen, from, to) ? 'q' : ''}`;
+    const snapshot = { fen, cards, lastMove }; // checkpoint for undo
+
+    setUndoHistory((prev) => [...prev, snapshot]);
     setSelectedSquare(null);
     setOptionSquares([]);
     setHintSquare(null);
+    setWrongMoveArrow(null);
     setEngineThinking(true);
     setLastMove({ from, to });
 
     try {
       const { data } = await tutorialApi.move(fen, uci, playerColor, difficulty);
       applyResponse(data);
+
+      // After a bad move, silently fetch hint for the pre-move position and show arrow
+      if (BAD_LABELS.includes(data.player_move.label)) {
+        try {
+          const { data: hintData } = await tutorialApi.hint(snapshot.fen, playerColor, difficulty);
+          const arrowFrom = hintData.best_move_uci.slice(0, 2) as Square;
+          const arrowTo   = hintData.best_move_uci.slice(2, 4) as Square;
+          setWrongMoveArrow([arrowFrom, arrowTo]);
+        } catch { /* hint failure is non-critical */ }
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
-      // revert last-move highlight
       setLastMove(null);
+      // Move never landed — roll back the checkpoint we just pushed
+      setUndoHistory((prev) => prev.slice(0, -1));
     } finally {
       setEngineThinking(false);
     }
-  }, [fen, playerColor, difficulty, applyResponse]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fen, cards, lastMove, playerColor, difficulty, applyResponse]);
 
   // ── Click-to-move ─────────────────────────────────────────────────────────
   const onSquareClick = useCallback((square: Square) => {
@@ -203,6 +229,21 @@ export default function TutorialPage() {
     return true;
   }, [engineThinking, phase, fen, playerColor, submitMove]);
 
+  // ── Undo last move ──────────────────────────────────────────────────────
+  const undoMove = useCallback(() => {
+    if (undoHistory.length === 0) return;
+    const prev = undoHistory[undoHistory.length - 1];
+    setUndoHistory((h) => h.slice(0, -1));
+    setFen(prev.fen);
+    setCards(prev.cards);
+    setLastMove(prev.lastMove);
+    setWrongMoveArrow(null);
+    setHintSquare(null);
+    setSelectedSquare(null);
+    setOptionSquares([]);
+    if (phase === 'gameover') setPhase('playing');
+  }, [undoHistory, phase]);
+
   // ── Hint ──────────────────────────────────────────────────────────────────
   const requestHint = useCallback(async () => {
     if (hintLoading || engineThinking || phase !== 'playing') return;
@@ -228,6 +269,8 @@ export default function TutorialPage() {
     setSelectedSquare(null);
     setOptionSquares([]);
     setHintSquare(null);
+    setWrongMoveArrow(null);
+    setUndoHistory([]);
     setGameOverInfo(null);
     setPhase('playing');
 
@@ -362,6 +405,14 @@ export default function TutorialPage() {
           >
             {hintLoading ? '…' : '💡 Hint'}
           </button>
+          <button
+            onClick={undoMove}
+            disabled={undoHistory.length === 0 || engineThinking}
+            title="Undo last move"
+            style={{ ...s.undoBtn, opacity: undoHistory.length === 0 || engineThinking ? 0.4 : 1 }}
+          >
+            ↩ Undo
+          </button>
           <button onClick={() => setPhase('setup')} style={s.newGameBtn}>
             New Game
           </button>
@@ -405,6 +456,11 @@ export default function TutorialPage() {
                   return playerColor === 'white' ? isWhitePiece : !isWhitePiece;
                 }}
                 customSquareStyles={customSquareStyles}
+                customArrows={
+                  wrongMoveArrow
+                    ? [[wrongMoveArrow[0], wrongMoveArrow[1], 'rgb(34,197,94)']]
+                    : []
+                }
                 customBoardStyle={{ borderRadius: 0 }}
                 areArrowsAllowed
                 animationDuration={150}
@@ -585,6 +641,16 @@ const s: Record<string, CSSProperties> = {
     border: '1px solid #365314',
     background: '#14532d',
     color: '#86efac',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  undoBtn: {
+    padding: '8px 16px',
+    borderRadius: 8,
+    border: '1px solid #44403c',
+    background: '#1c1917',
+    color: '#d6d3d1',
     fontSize: 14,
     fontWeight: 600,
     cursor: 'pointer',
