@@ -81,47 +81,89 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
   const [boardWidth] = useState(460);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Selected brush (click-to-select in tray, click-to-place on board) ─────
+  const [brush, setBrush] = useState<PieceCode | null>(null);
+
   // ── Drag-from-palette state ────────────────────────────────────────────────
-  const [paletteDrag, setPaletteDrag] = useState<PieceCode | null>(null);
   const [hoverSquare, setHoverSquare] = useState<string | null>(null);
   const dragPieceRef = useRef<PieceCode | null>(null);
+  const isDraggingFromTray = useRef(false);
 
   const flipped = playerColor === 'black';
+
+  // ── Select a piece from tray (click) ──────────────────────────────────────
+  const onTrayClick = (code: PieceCode) => {
+    setBrush((prev) => (prev === code ? null : code)); // toggle off if same
+    setError(null);
+  };
 
   // ── Drag-from-palette: start ───────────────────────────────────────────────
   const onPaletteDragStart = (e: React.DragEvent, code: PieceCode) => {
     dragPieceRef.current = code;
-    setPaletteDrag(code);
+    isDraggingFromTray.current = true;
+    // Required for HTML5 drag to be valid in all browsers
+    e.dataTransfer.setData('text/plain', code);
+    e.dataTransfer.effectAllowed = 'copy';
+    const sym = ALL_PIECES.find((p) => p.code === code)?.sym ?? '';
     const ghost = document.createElement('div');
-    ghost.style.cssText = 'position:fixed;top:-999px;left:-999px;font-size:40px;line-height:1;';
-    ghost.textContent = ALL_PIECES.find((p) => p.code === code)?.sym ?? '';
+    ghost.style.cssText = 'position:fixed;top:-999px;left:-999px;font-size:44px;line-height:1;background:transparent;';
+    ghost.textContent = sym;
     document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, 20, 20);
+    e.dataTransfer.setDragImage(ghost, 22, 22);
     setTimeout(() => document.body.removeChild(ghost), 0);
   };
 
   const onPaletteDragEnd = () => {
-    setPaletteDrag(null);
-    setHoverSquare(null);
+    isDraggingFromTray.current = false;
     dragPieceRef.current = null;
+    setHoverSquare(null);
   };
 
-  // ── Overlay cell handlers (drop targets over the board) ────────────────────
-  const onOverlayDragOver = (e: React.DragEvent, row: number, col: number) => {
+  // ── Board as drag target (palette → board) ─────────────────────────────────
+  // We attach dragover/drop directly to the board wrapper div instead of an overlay
+  // so it works regardless of re-render timing.
+  const onBoardDragOver = (e: React.DragEvent) => {
+    if (!isDraggingFromTray.current) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    setHoverSquare(rowColToSquare(row, col, flipped));
+    // Compute which square the cursor is over
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cellSize = boardWidth / 8;
+    const col = Math.floor(x / cellSize);
+    const row = Math.floor(y / cellSize);
+    if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+      setHoverSquare(rowColToSquare(row, col, flipped));
+    }
   };
 
-  const onOverlayDrop = (row: number, col: number) => {
-    const piece = dragPieceRef.current;
+  const onBoardDrop = (e: React.DragEvent) => {
+    if (!isDraggingFromTray.current) return;
+    e.preventDefault();
+    const piece = e.dataTransfer.getData('text/plain') || dragPieceRef.current;
     if (!piece) return;
-    const sq = rowColToSquare(row, col, flipped);
-    setError(null);
-    setPosition((prev) => ({ ...prev, [sq]: piece }));
-    setPaletteDrag(null);
-    setHoverSquare(null);
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cellSize = boardWidth / 8;
+    const col = Math.floor(x / cellSize);
+    const row = Math.floor(y / cellSize);
+    if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+      const sq = rowColToSquare(row, col, flipped);
+      setError(null);
+      setPosition((prev) => ({ ...prev, [sq]: piece }));
+    }
+    isDraggingFromTray.current = false;
     dragPieceRef.current = null;
+    setHoverSquare(null);
+  };
+
+  const onBoardDragLeave = (e: React.DragEvent) => {
+    // Only clear hover if leaving the board container entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setHoverSquare(null);
+    }
   };
 
   // ── Drag pieces already on the board to reposition ────────────────────────
@@ -136,16 +178,21 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
     return true;
   }, []);
 
-  // ── Click a board piece to remove it ─────────────────────────────────────
+  // ── Click a board square ───────────────────────────────────────────────────
+  // If brush selected: place it. If clicking a piece with no brush: remove it.
   const onSquareClick = useCallback((square: Square) => {
     setError(null);
-    setPosition((prev) => {
-      if (!prev[square]) return prev;
-      const next = { ...prev };
-      delete next[square];
-      return next;
-    });
-  }, []);
+    if (brush) {
+      setPosition((prev) => ({ ...prev, [square]: brush }));
+    } else {
+      setPosition((prev) => {
+        if (!prev[square]) return prev;
+        const next = { ...prev };
+        delete next[square];
+        return next;
+      });
+    }
+  }, [brush]);
 
   const handleClear = () => { setPosition({}); setError(null); };
   const handleReset = () => { setPosition({ ...START_POS }); setError(null); };
@@ -159,10 +206,16 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
     onConfirm(fen, playerColor);
   };
 
-  // ── Highlight hovered square during palette drag ───────────────────────────
+  // ── Custom square styles ───────────────────────────────────────────────────
   const customSquareStyles: Record<string, CSSProperties> = {};
   if (hoverSquare) {
     customSquareStyles[hoverSquare] = { backgroundColor: 'rgba(59,130,246,0.55)' };
+  }
+  // Highlight squares that already contain the selected brush piece
+  if (brush) {
+    Object.entries(position).forEach(([sq, pc]) => {
+      if (pc === brush) customSquareStyles[sq] = { backgroundColor: 'rgba(34,197,94,0.35)' };
+    });
   }
 
   return (
@@ -173,9 +226,9 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
         <div style={s.titleRow}>
           <h2 style={s.title}>Set Up Custom Position</h2>
           <p style={s.subtitle}>
-            Drag any piece from the tray below onto the board.&nbsp;
-            Drag pieces on the board to reposition them.&nbsp;
-            Click a piece on the board to remove it.
+            <strong>Click</strong> a piece in the tray to select it, then <strong>click</strong> a square to place it.&nbsp;
+            Or <strong>drag</strong> a tray piece directly onto the board.&nbsp;
+            Drag board pieces to reposition. Click an unselected board piece to remove it.
           </p>
         </div>
 
@@ -187,15 +240,16 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
               {WHITE_PIECES.map((p) => (
                 <div
                   key={p.code}
-                  title={p.label + ' — drag onto board'}
+                  title={p.label + ' — click to select, then click board to place; or drag'}
                   draggable
+                  onClick={() => onTrayClick(p.code)}
                   onDragStart={(e) => onPaletteDragStart(e, p.code)}
                   onDragEnd={onPaletteDragEnd}
                   style={{
                     ...s.trayPiece,
                     color: '#f8fafc',
                     textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                    ...(paletteDrag === p.code ? s.trayPieceDragging : {}),
+                    ...(brush === p.code ? s.trayPieceActive : {}),
                   }}
                 >
                   {p.sym}
@@ -212,14 +266,15 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
               {BLACK_PIECES.map((p) => (
                 <div
                   key={p.code}
-                  title={p.label + ' — drag onto board'}
+                  title={p.label + ' — click to select, then click board to place; or drag'}
                   draggable
+                  onClick={() => onTrayClick(p.code)}
                   onDragStart={(e) => onPaletteDragStart(e, p.code)}
                   onDragEnd={onPaletteDragEnd}
                   style={{
                     ...s.trayPiece,
                     color: '#7dd3fc',
-                    ...(paletteDrag === p.code ? s.trayPieceDragging : {}),
+                    ...(brush === p.code ? s.trayPieceActive : {}),
                   }}
                 >
                   {p.sym}
@@ -231,53 +286,30 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
 
         <div style={s.layout}>
 
-          {/* ── Board with drag-overlay ── */}
-          <div style={{ position: 'relative', width: boardWidth, height: boardWidth, flexShrink: 0 }}>
+          {/* ── Board ── */}
+          <div
+            style={{ position: 'relative', width: boardWidth, height: boardWidth, flexShrink: 0 }}
+            onDragOver={onBoardDragOver}
+            onDrop={onBoardDrop}
+            onDragLeave={onBoardDragLeave}
+          >
             <Chessboard
               position={position}
               boardWidth={boardWidth}
               boardOrientation={flipped ? 'black' : 'white'}
               onSquareClick={onSquareClick}
               onPieceDrop={onPieceDrop}
-              isDraggablePiece={() => true}
+              isDraggablePiece={() => !isDraggingFromTray.current}
               customDarkSquareStyle={{ backgroundColor: theme.dark }}
               customLightSquareStyle={{ backgroundColor: theme.light }}
-              customBoardStyle={{ borderRadius: 6, boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }}
+              customBoardStyle={{
+                borderRadius: 6,
+                boxShadow: brush ? '0 0 0 3px #3b82f6, 0 4px 24px rgba(0,0,0,0.5)' : '0 4px 24px rgba(0,0,0,0.5)',
+              }}
               customSquareStyles={customSquareStyles}
               areArrowsAllowed={false}
               animationDuration={80}
             />
-
-            {/* Transparent 8×8 overlay — captures palette drops */}
-            {paletteDrag && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0, left: 0,
-                  width: boardWidth, height: boardWidth,
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(8, 1fr)',
-                  gridTemplateRows: 'repeat(8, 1fr)',
-                  zIndex: 20,
-                  cursor: 'copy',
-                  borderRadius: 6,
-                }}
-                onDragLeave={() => setHoverSquare(null)}
-              >
-                {Array.from({ length: 64 }, (_, i) => {
-                  const row = Math.floor(i / 8);
-                  const col = i % 8;
-                  return (
-                    <div
-                      key={i}
-                      onDragOver={(e) => onOverlayDragOver(e, row, col)}
-                      onDrop={() => onOverlayDrop(row, col)}
-                      style={{ width: '100%', height: '100%' }}
-                    />
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {/* ── Right panel ── */}
@@ -321,9 +353,14 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
             {/* Hint card */}
             <div style={s.hintBox}>
               <p style={s.hintText}>
-                💡 <strong>Drag</strong> pieces from the tray onto the board.<br />
-                <strong>Drag</strong> board pieces to reposition them.<br />
-                <strong>Click</strong> a board piece to remove it.
+                {brush ? (
+                  <>✅ <strong>{ALL_PIECES.find((p) => p.code === brush)?.label}</strong> selected — click any square to place it. Click tray piece again to deselect.</>
+                ) : (
+                  <>💡 <strong>Click</strong> a tray piece to select it, then click a square.<br />
+                  <strong>Drag</strong> a tray piece onto a square.<br />
+                  <strong>Click</strong> a board piece (no selection) to remove it.<br />
+                  <strong>Drag</strong> board pieces to reposition.</>
+                )}
               </p>
             </div>
 
@@ -412,6 +449,12 @@ const s: Record<string, CSSProperties> = {
     cursor: 'grab',
     userSelect: 'none',
     transition: 'border-color 0.15s, transform 0.1s, opacity 0.1s',
+  },
+  trayPieceActive: {
+    borderColor: '#3b82f6',
+    background: '#1e3a5f',
+    transform: 'scale(1.08)',
+    boxShadow: '0 0 0 2px #60a5fa',
   },
   trayPieceDragging: {
     opacity: 0.4,
