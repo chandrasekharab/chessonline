@@ -71,7 +71,16 @@ export class StockfishProcess extends EventEmitter {
 
   async evaluate(fen: string, depth: number): Promise<EngineEvaluationResult> {
     if (!this.ready) throw new Error('Engine not ready');
+    return this._search(fen, `go depth ${depth}`);
+  }
 
+  /** Time-capped search — always returns within movetime + a small buffer. */
+  async evaluateTimed(fen: string, movetime: number): Promise<EngineEvaluationResult> {
+    if (!this.ready) throw new Error('Engine not ready');
+    return this._search(fen, `go movetime ${movetime}`);
+  }
+
+  private _search(fen: string, goCmd: string): Promise<EngineEvaluationResult> {
     return new Promise((resolve, reject) => {
       let bestLine = '';
       let bestMove = '';
@@ -94,7 +103,7 @@ export class StockfishProcess extends EventEmitter {
           // Parse score from last info line
           const scoreMatch = bestLine.match(/score (cp|mate) (-?\d+)/);
           if (!scoreMatch) {
-            resolve({ score: 0, mate: null, bestMove, depth });
+            resolve({ score: 0, mate: null, bestMove, depth: 0 });
             return;
           }
 
@@ -106,18 +115,17 @@ export class StockfishProcess extends EventEmitter {
               score: mateToCentipawns(scoreValue),
               mate: scoreValue,
               bestMove,
-              depth,
+              depth: 0,
             });
           } else {
-            resolve({ score: scoreValue, mate: null, bestMove, depth });
+            resolve({ score: scoreValue, mate: null, bestMove, depth: 0 });
           }
         }
       };
 
       this.on('line', onLine);
-
       this.send(`position fen ${fen}`);
-      this.send(`go depth ${depth}`);
+      this.send(goCmd);
     });
   }
 
@@ -178,8 +186,17 @@ export class EngineService {
   async evaluate(fen: string, depth = env.ENGINE_DEPTH): Promise<EngineEvaluationResult> {
     const engine = await this.acquire();
     try {
-      const result = await engine.evaluate(fen, depth);
-      return result;
+      return await engine.evaluate(fen, depth);
+    } finally {
+      this.release(engine);
+    }
+  }
+
+  /** Fast time-capped evaluation for interactive use (tutorial, hints). */
+  async evaluateFast(fen: string, movetime: number): Promise<EngineEvaluationResult> {
+    const engine = await this.acquire();
+    try {
+      return await engine.evaluateTimed(fen, movetime);
     } finally {
       this.release(engine);
     }

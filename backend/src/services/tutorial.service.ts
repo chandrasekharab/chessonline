@@ -3,13 +3,19 @@ import { engineService } from './engine.service';
 import { classifyMove, clampEval } from '../utils/classification';
 import { MoveLabel } from '../types';
 
-// ── Depth by difficulty (1 = easy / 5 = hard) ─────────────────────────────
-const DEPTH_BY_DIFFICULTY: Record<number, number> = {
-  1: 5, 2: 8, 3: 11, 4: 14, 5: 17,
+// ── Movetime budgets by difficulty (ms) ───────────────────────────────────
+// classify: score-only evals (fast); reply: engine's actual move (quality)
+const MOVETIME_BY_DIFFICULTY: Record<number, { classify: number; reply: number }> = {
+  1: { classify: 150, reply: 200 },
+  2: { classify: 150, reply: 300 },
+  3: { classify: 200, reply: 500 },
+  4: { classify: 200, reply: 700 },
+  5: { classify: 200, reply: 1000 },
 };
 
-function depthFor(difficulty: number): number {
-  return DEPTH_BY_DIFFICULTY[Math.max(1, Math.min(5, difficulty))] ?? 11;
+function movetimeFor(difficulty: number): { classify: number; reply: number } {
+  return MOVETIME_BY_DIFFICULTY[Math.max(1, Math.min(5, difficulty))]
+    ?? { classify: 200, reply: 500 };
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -255,11 +261,11 @@ export async function processPlayerMove(
   _playerColor: 'white' | 'black',
   difficulty = 3,
 ): Promise<TutorialMoveResponse> {
-  const depth = depthFor(difficulty);
+  const mv = movetimeFor(difficulty);
   const chess = new Chess(fen);
 
   // Eval the position BEFORE the player's move (also gives us hint / best move)
-  const evalBefore = await engineService.evaluate(fen, depth);
+  const evalBefore = await engineService.evaluateFast(fen, mv.classify);
   const evalBeforeCp = clampEval(evalBefore.score);
   const bestMoveSan = uciToSan(fen, evalBefore.bestMove ?? '');
 
@@ -273,8 +279,8 @@ export async function processPlayerMove(
   const isCheckAfterPlayer = chess.isCheck();
   const playerKind = detectKind(moveResult.flags, moveResult.san, isCheckAfterPlayer);
 
-  // Eval AFTER player's move
-  const evalAfterPlayer = await engineService.evaluate(fenAfterPlayer, depth);
+  // Eval AFTER player's move (reply quality — this also gives us the engine's move)
+  const evalAfterPlayer = await engineService.evaluateFast(fenAfterPlayer, mv.reply);
   const evalAfterPlayerCp = clampEval(evalAfterPlayer.score);
 
   // Normalise to white's perspective for classification & display
@@ -344,8 +350,8 @@ export async function processPlayerMove(
   const isCheckAfterEngine = chess.isCheck();
   const engineKind = detectKind(engineMoveResult.flags, engineMoveResult.san, isCheckAfterEngine);
 
-  // Eval AFTER engine's move
-  const evalAfterEngine = await engineService.evaluate(fenAfterEngine, depth);
+  // Eval AFTER engine's move (score only)
+  const evalAfterEngine = await engineService.evaluateFast(fenAfterEngine, mv.classify);
   const evalAfterEngineCp = clampEval(evalAfterEngine.score);
 
   // Engine's eval_before from white perspective = evalAfterWhite (same position)
@@ -390,8 +396,8 @@ export async function getHint(
   _playerColor: 'white' | 'black',
   difficulty = 3,
 ): Promise<TutorialHintResponse> {
-  const depth = depthFor(difficulty);
-  const evalResult = await engineService.evaluate(fen, depth);
+  const mv = movetimeFor(difficulty);
+  const evalResult = await engineService.evaluateFast(fen, mv.reply);
   const chess = new Chess(fen);
   const isWhiteTurn = chess.turn() === 'w';
   const rawCp = clampEval(evalResult.score);
@@ -420,8 +426,8 @@ export async function engineFirstMove(
   fen: string,
   difficulty = 3,
 ): Promise<TutorialFirstMoveResponse> {
-  const depth = depthFor(difficulty);
-  const evalResult = await engineService.evaluate(fen, depth);
+  const mv = movetimeFor(difficulty);
+  const evalResult = await engineService.evaluateFast(fen, mv.reply);
   const chess = new Chess(fen);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const moveResult = chess.move(evalResult.bestMove as any);
