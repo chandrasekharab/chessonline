@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, CSSProperties } from 'react';
 import { Chessboard } from 'react-chessboard';
+import { useBoardThemeStore } from '../../store/boardThemeStore';
 
 interface Props {
   fen: string;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function ChessBoardView({ fen, orientation = 'white', lastMove }: Props) {
+  const theme = useBoardThemeStore((s) => s.getTheme());
   const [boardWidth, setBoardWidth] = useState(400);
   const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
 
@@ -51,8 +53,8 @@ export default function ChessBoardView({ fen, orientation = 'white', lastMove }:
           borderRadius: 6,
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
         }}
-        customDarkSquareStyle={{ backgroundColor: '#4a7c59' }}
-        customLightSquareStyle={{ backgroundColor: '#f0d9b5' }}
+        customDarkSquareStyle={{ backgroundColor: theme.dark }}
+        customLightSquareStyle={{ backgroundColor: theme.light }}
       />
       {/* Resize grip */}
       <div

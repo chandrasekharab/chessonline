@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, CSSProperties } from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
+import { useBoardThemeStore } from '../../store/boardThemeStore';
 import toast from 'react-hot-toast';
 import {
   tutorialApi,
@@ -63,6 +64,7 @@ function isPromotion(fen: string, from: Square, to: Square): boolean {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function TutorialPage() {
+  const boardTheme = useBoardThemeStore((s) => s.getTheme());
   const [phase, setPhase] = useState<GamePhase>('setup');
   const [playerColor, setPlayerColor] = useState<'white' | 'black'>('white');
   const [difficulty, setDifficulty] = useState(3);
@@ -482,6 +484,8 @@ export default function TutorialPage() {
                     ? [[wrongMoveArrow[0], wrongMoveArrow[1], 'rgb(34,197,94)']]
                     : []
                 }
+                customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+                customLightSquareStyle={{ backgroundColor: boardTheme.light }}
                 customBoardStyle={{ borderRadius: 0 }}
                 areArrowsAllowed
                 animationDuration={280}

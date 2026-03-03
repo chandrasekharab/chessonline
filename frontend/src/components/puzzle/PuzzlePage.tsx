@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
+import { useBoardThemeStore } from '../../store/boardThemeStore';
 import toast from 'react-hot-toast';
 import { puzzleApi, PuzzlePublic, PuzzleMoveResult, getErrorMessage } from '../../services/api';
 
@@ -52,6 +53,7 @@ const DIFF_LABELS: Record<number, string> = {
 type Phase = 'loading' | 'playing' | 'solved' | 'resigned';
 
 export default function PuzzlePage() {
+  const boardTheme = useBoardThemeStore((s) => s.getTheme());
   const [puzzle, setPuzzle]     = useState<PuzzlePublic | null>(null);
   const [phase, setPhase]       = useState<Phase>('loading');
   const [fen, setFen]           = useState('');
@@ -267,6 +269,8 @@ export default function PuzzlePage() {
               onSquareClick={handleSquareClick}
               onPieceDrop={onPieceDrop}
               customSquareStyles={customSquareStyles}
+              customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+              customLightSquareStyle={{ backgroundColor: boardTheme.light }}
               arePremovesAllowed={false}
             />
           </div>

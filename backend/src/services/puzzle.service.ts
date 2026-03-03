@@ -93,13 +93,23 @@ export async function getNextPuzzle(
   let result = await pool.query<PuzzleRow>(query, params);
 
   if (result.rows.length === 0) {
-    // All solved — pick any random puzzle
-    const fallbackParams: (string | number)[] = [];
-    const fallbackConds: string[] = [];
-    if (theme) { fallbackParams.push(theme); fallbackConds.push(`theme = $1`); }
-    if (difficulty) { fallbackParams.push(difficulty); fallbackConds.push(`difficulty = $${fallbackParams.length}`); }
-    const fw = fallbackConds.length ? `WHERE ${fallbackConds.join(' AND ')}` : '';
-    result = await pool.query<PuzzleRow>(`SELECT * FROM puzzles ${fw} ORDER BY RANDOM() LIMIT 1`, fallbackParams);
+    // No unsolved puzzles at this difficulty — fall back to any unsolved puzzle
+    // (drop the difficulty constraint so we always return something)
+    result = await pool.query<PuzzleRow>(
+      `SELECT p.* FROM puzzles p
+       WHERE p.id NOT IN (
+         SELECT puzzle_id FROM puzzle_attempts WHERE user_id = $1 AND solved = true
+       )
+       ORDER BY p.difficulty ASC, RANDOM() LIMIT 1`,
+      [userId],
+    );
+  }
+
+  if (result.rows.length === 0) {
+    // All puzzles solved — return any random puzzle ignoring filters
+    result = await pool.query<PuzzleRow>(
+      `SELECT * FROM puzzles ORDER BY RANDOM() LIMIT 1`,
+    );
   }
 
   return result.rows.length ? toPuzzlePublic(result.rows[0]) : null;

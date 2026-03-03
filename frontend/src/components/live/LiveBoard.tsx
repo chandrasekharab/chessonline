@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState, useRef, CSSProperties, ReactElement } from 'react';
 import { Chessboard } from 'react-chessboard';
+import { useBoardThemeStore } from '../../store/boardThemeStore';
 import { Chess, Square } from 'chess.js';
 import { useLiveGameStore } from '../../store/liveGameStore';
 import { getSocket } from '../../services/socket';
@@ -61,6 +62,7 @@ function isPromotion(fen: string, from: Square, to: Square): boolean {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LiveBoard() {
+  const boardTheme = useBoardThemeStore((s) => s.getTheme());
   const {
     gameId, game, myColor, fen, moves,
     whiteTimeMs, blackTimeMs,
@@ -318,6 +320,8 @@ export default function LiveBoard() {
               areArrowsAllowed
               customBoardStyle={{ borderRadius: '0' }}
               customSquareStyles={customSquareStyles}
+              customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+              customLightSquareStyle={{ backgroundColor: boardTheme.light }}
               animationDuration={150}
             />
           </div>
