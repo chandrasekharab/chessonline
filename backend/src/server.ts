@@ -5,12 +5,16 @@ import { env } from './config/env';
 import { checkDatabaseConnection } from './config/database';
 import { redisConnection } from './config/redis';
 import { createSocketServer } from './socket';
+import { engineService } from './services/engine.service';
 import { logger } from './utils/logger';
 
 async function start(): Promise<void> {
   // Verify connectivity before accepting traffic
   await checkDatabaseConnection();
   await redisConnection.connect();
+
+  // Initialise Stockfish pool (needed for tutorial / hint endpoints)
+  await engineService.init();
 
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer);
