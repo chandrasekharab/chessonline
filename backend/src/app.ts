@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes';
 import gamesRoutes from './routes/games.routes';
 import liveRoutes from './routes/live.routes';
 import tutorialRoutes from './routes/tutorial.routes';
+import puzzleRoutes from './routes/puzzle.routes';
 import { env } from './config/env';
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/auth', authRoutes);
 app.use('/games', gamesRoutes);
 app.use('/live', liveRoutes);
 app.use('/tutorial', tutorialRoutes);
+app.use('/puzzles', puzzleRoutes);
 
 // Error handling
 app.use(notFoundHandler);

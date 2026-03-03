@@ -116,6 +116,49 @@ export const tutorialApi = {
     api.post<TutorialFirstMoveResponse>('/tutorial/engine-first-move', { difficulty }),
 };
 
+// ─── Puzzles ───────────────────────────────────────────────────────────────
+
+export interface PuzzlePublic {
+  id: string;
+  fen: string;
+  theme: string;
+  difficulty: number;
+  title: string;
+  description: string;
+  total_player_moves: number;
+}
+
+export interface PuzzleMoveResult {
+  correct: boolean;
+  solved: boolean;
+  engine_reply_uci?: string;
+  engine_reply_fen?: string;
+  solution_uci?: string;
+  feedback: string;
+}
+
+export interface PuzzleStats {
+  solved_count: number;
+  attempted_count: number;
+  accuracy: number;
+}
+
+export const puzzleApi = {
+  next: (theme?: string, difficulty?: number) =>
+    api.get<{ puzzle: PuzzlePublic }>('/puzzles/next', {
+      params: { ...(theme && { theme }), ...(difficulty && { difficulty }) },
+    }),
+
+  move: (id: string, moveUci: string, currentFen: string, solutionIndex: number) =>
+    api.post<PuzzleMoveResult>(`/puzzles/${id}/move`, { moveUci, currentFen, solutionIndex }),
+
+  resign: (id: string) =>
+    api.post<{ solution_uci: string }>(`/puzzles/${id}/resign`),
+
+  stats: () =>
+    api.get<PuzzleStats>('/puzzles/stats'),
+};
+
 // Helper: extract error message
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {

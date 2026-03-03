@@ -7,6 +7,7 @@ import Dashboard from './components/dashboard/Dashboard';
 import GameView from './components/game/GameView';
 import MatchmakingLobby from './components/live/MatchmakingLobby';
 import TutorialPage from './components/tutorial/TutorialPage';
+import PuzzlePage from './components/puzzle/PuzzlePage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/games/:id" element={<GameView />} />
             <Route path="/play" element={<MatchmakingLobby />} />
             <Route path="/tutorial" element={<TutorialPage />} />
+            <Route path="/puzzles" element={<PuzzlePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
