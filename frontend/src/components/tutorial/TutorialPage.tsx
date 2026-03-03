@@ -114,42 +114,46 @@ export default function TutorialPage() {
   }, [boardWidth]);
 
   // ── Apply a server response ───────────────────────────────────────────────
-  const applyResponse = useCallback((resp: TutorialMoveResponse) => {
-    const newCards: MoveCard[] = [];
+  // Returns a Promise that resolves only after all animations complete, so
+  // engineThinking can remain true throughout (board stays locked).
+  const ANIM_MS = 280; // keep in sync with animationDuration prop
 
-    newCards.push({
-      key: `${Date.now()}-player`,
-      isPlayer: true,
-      detail: resp.player_move,
+  const applyResponse = useCallback((resp: TutorialMoveResponse): Promise<void> => {
+    return new Promise((resolve) => {
+      const newCards: MoveCard[] = [];
+      newCards.push({ key: `${Date.now()}-player`, isPlayer: true, detail: resp.player_move });
+
+      if (resp.engine_move) {
+        // Step 1 — animate the player's move
+        const pFrom = resp.player_move.uci.slice(0, 2) as Square;
+        const pTo   = resp.player_move.uci.slice(2, 4) as Square;
+        setLastMove({ from: pFrom, to: pTo });
+        setFen(resp.fen_after_player);
+
+        newCards.push({ key: `${Date.now()}-engine`, isPlayer: false, detail: resp.engine_move });
+        setCards((prev) => [...prev, ...newCards]);
+
+        // Step 2 — after player animation settles, animate the engine's move
+        const eFrom = resp.engine_move.uci.slice(0, 2) as Square;
+        const eTo   = resp.engine_move.uci.slice(2, 4) as Square;
+        setTimeout(() => {
+          setLastMove({ from: eFrom, to: eTo });
+          setFen(resp.fen_after_engine);
+          if (resp.game_over) { setGameOverInfo(resp.game_over); setPhase('gameover'); }
+          // Wait for engine animation to finish before releasing the board
+          setTimeout(resolve, ANIM_MS + 50);
+        }, ANIM_MS + 80);
+      } else {
+        const pFrom = resp.player_move.uci.slice(0, 2) as Square;
+        const pTo   = resp.player_move.uci.slice(2, 4) as Square;
+        setLastMove({ from: pFrom, to: pTo });
+        setFen(resp.fen_after_player);
+        setCards((prev) => [...prev, ...newCards]);
+        if (resp.game_over) { setGameOverInfo(resp.game_over); setPhase('gameover'); }
+        resolve();
+      }
     });
-
-    if (resp.engine_move) {
-      const [from, to] = [
-        resp.engine_move.uci.slice(0, 2) as Square,
-        resp.engine_move.uci.slice(2, 4) as Square,
-      ];
-      setLastMove({ from, to });
-      newCards.push({
-        key: `${Date.now()}-engine`,
-        isPlayer: false,
-        detail: resp.engine_move,
-      });
-      setFen(resp.fen_after_engine);
-    } else {
-      const [from, to] = [
-        resp.player_move.uci.slice(0, 2) as Square,
-        resp.player_move.uci.slice(2, 4) as Square,
-      ];
-      setLastMove({ from, to });
-      setFen(resp.fen_after_player);
-    }
-
-    setCards((prev) => [...prev, ...newCards]);
-
-    if (resp.game_over) {
-      setGameOverInfo(resp.game_over);
-      setPhase('gameover');
-    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Submit a player move ──────────────────────────────────────────────────
@@ -169,7 +173,8 @@ export default function TutorialPage() {
 
     try {
       const { data } = await tutorialApi.move(fen, uci, playerColor, difficulty);
-      applyResponse(data);
+      // Await the full two-step animation before releasing engineThinking
+      await applyResponse(data);
 
       // After a bad move, silently fetch hint for the pre-move position and show arrow
       if (BAD_LABELS.includes(data.player_move.label)) {
@@ -463,7 +468,7 @@ export default function TutorialPage() {
                 }
                 customBoardStyle={{ borderRadius: 0 }}
                 areArrowsAllowed
-                animationDuration={150}
+                animationDuration={280}
               />
             </div>
             {/* Resize grip */}
