@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+FROM node:20-slim AS builder
+WORKDIR /app
+COPY package*.json .npmrc ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --no-audit --no-fund --prefer-offline
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# ─── Runtime ──────────────────────────────────────────────────────────────────
+FROM node:20-slim AS runtime
+WORKDIR /app
+
+# Install Stockfish
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends stockfish && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy production node_modules and compiled output from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+
+CMD ["node", "dist/workers/analysis.worker.js"]
+

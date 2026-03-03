@@ -1,0 +1,110 @@
+services:
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: chess_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chess_user
+      POSTGRES_PASSWORD: chess_pass
+      POSTGRES_DB: chess_insight
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    ports:
+      - "7432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chess_user -d chess_insight"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: chess_redis
+    restart: unless-stopped
+    ports:
+      - "7379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend API ────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chess_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 7000
+      DATABASE_URL: postgresql://chess_user:chess_pass@postgres:5432/chess_insight
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_IN_PRODUCTION_USE_LONG_RANDOM_STRING}
+      JWT_EXPIRES_IN: 7d
+      STOCKFISH_PATH: /usr/games/stockfish
+      ENGINE_DEPTH: 18
+      ENGINE_MAX_CONCURRENT: 2
+      MAX_FILE_SIZE_MB: 5
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8001}
+    ports:
+      - "8000:7000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:7000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ─── Analysis Worker ────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: chess_worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://chess_user:chess_pass@postgres:5432/chess_insight
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_IN_PRODUCTION_USE_LONG_RANDOM_STRING}
+      STOCKFISH_PATH: /usr/games/stockfish
+      ENGINE_DEPTH: 18
+      ENGINE_MAX_CONCURRENT: 2
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+
+  # ─── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: chess_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8001:80"
+
+volumes:
+  postgres_data:
+  redis_data:
