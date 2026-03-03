@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, User, Swords } from 'lucide-react';
+import { LogOut, User, Swords, GraduationCap } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { disconnectSocket } from '../../services/socket';
 
@@ -22,6 +22,10 @@ export default function Navbar() {
         <Link to="/play" style={styles.playLink}>
           <Swords size={15} style={{ marginRight: 5 }} />
           Play
+        </Link>
+        <Link to="/tutorial" style={styles.tutorialLink}>
+          <GraduationCap size={15} style={{ marginRight: 5 }} />
+          Tutorial
         </Link>
       </div>
       <div style={styles.right}>
@@ -69,6 +73,19 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     border: '1px solid #1e3a5f',
     background: '#0c2340',
+    transition: 'background 0.2s',
+  },
+  tutorialLink: {
+    display: 'flex',
+    alignItems: 'center',
+    color: '#86efac',
+    fontWeight: 600,
+    fontSize: 15,
+    textDecoration: 'none',
+    padding: '4px 10px',
+    borderRadius: 6,
+    border: '1px solid #14532d',
+    background: '#052e16',
     transition: 'background 0.2s',
   },
   right: {

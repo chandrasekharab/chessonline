@@ -72,6 +72,50 @@ export const gamesApi = {
   getAnalysis: (id: string) => api.get<AnalysisResponse>(`/games/${id}/analysis`),
 };
 
+// ─── Tutorial ──────────────────────────────────────────────────────────────
+
+export interface TutorialMoveDetail {
+  uci: string;
+  san: string;
+  label: string;
+  eval_before: number;
+  eval_after: number;
+  explanation: string;
+}
+
+export interface TutorialMoveResponse {
+  player_move: TutorialMoveDetail;
+  engine_move: TutorialMoveDetail | null;
+  fen_after_player: string;
+  fen_after_engine: string;
+  game_over: { winner: 'white' | 'black' | 'draw'; reason: string } | null;
+}
+
+export interface TutorialHintResponse {
+  best_move_uci: string;
+  best_move_san: string;
+  explanation: string;
+  eval_cp: number;
+}
+
+export interface TutorialFirstMoveResponse {
+  uci: string;
+  san: string;
+  explanation: string;
+  fen_after: string;
+}
+
+export const tutorialApi = {
+  move: (fen: string, move: string, playerColor: 'white' | 'black', difficulty: number) =>
+    api.post<TutorialMoveResponse>('/tutorial/move', { fen, move, playerColor, difficulty }),
+
+  hint: (fen: string, playerColor: 'white' | 'black', difficulty: number) =>
+    api.post<TutorialHintResponse>('/tutorial/hint', { fen, playerColor, difficulty }),
+
+  engineFirstMove: (difficulty: number) =>
+    api.post<TutorialFirstMoveResponse>('/tutorial/engine-first-move', { difficulty }),
+};
+
 // Helper: extract error message
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
