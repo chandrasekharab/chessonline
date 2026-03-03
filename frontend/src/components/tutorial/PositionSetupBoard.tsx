@@ -56,7 +56,7 @@ function positionToFen(pos: BoardPosition, turn: 'w' | 'b'): string | null {
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   initialPlayerColor: 'white' | 'black';
-  onConfirm: (fen: string) => void;
+  onConfirm: (fen: string, playerColor: 'white' | 'black') => void;
   onCancel: () => void;
 }
 
@@ -65,6 +65,7 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
   const theme = useBoardThemeStore((s) => s.getTheme());
   const [position, setPosition] = useState<BoardPosition>({ ...START_POS });
   const [brush, setBrush] = useState<PieceCode | null>(null); // null = eraser
+  const [playerColor, setPlayerColor] = useState<'white' | 'black'>(initialPlayerColor);
   const [turn, setTurn] = useState<'w' | 'b'>(initialPlayerColor === 'white' ? 'w' : 'b');
   const [boardWidth] = useState(440);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +105,7 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
       setError('Invalid position — both sides must have exactly one king, and no pawns on ranks 1 or 8.');
       return;
     }
-    onConfirm(fen);
+    onConfirm(fen, playerColor);
   };
 
   // ── Highlight selected brush square ───────────────────────────────────────
@@ -134,7 +135,7 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
             <Chessboard
               position={position}
               boardWidth={boardWidth}
-              boardOrientation={initialPlayerColor === 'black' ? 'black' : 'white'}
+              boardOrientation={playerColor === 'black' ? 'black' : 'white'}
               onSquareClick={onSquareClick}
               onPieceDrop={onPieceDrop}
               isDraggablePiece={() => true}
@@ -181,9 +182,25 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
               )}
             </div>
 
-            {/* Turn selector */}
+            {/* Play as */}
             <div style={s.section}>
-              <p style={s.sectionLabel}>Side to Move</p>
+              <p style={s.sectionLabel}>Play as</p>
+              <div style={s.turnRow}>
+                {(['white', 'black'] as const).map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setPlayerColor(c)}
+                    style={{ ...s.turnBtn, ...(playerColor === c ? s.turnBtnActive : {}) }}
+                  >
+                    {c === 'white' ? '♔ White' : '♚ Black'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Side to Move */}
+            <div style={s.section}>
+              <p style={s.sectionLabel}>Side to Move First</p>
               <div style={s.turnRow}>
                 {(['w', 'b'] as const).map((t) => (
                   <button

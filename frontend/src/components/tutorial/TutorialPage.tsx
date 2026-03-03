@@ -285,7 +285,8 @@ export default function TutorialPage() {
   }, [hintLoading, engineThinking, phase, fen, playerColor, difficulty]);
 
   // ── Start game (supports custom FEN for position-setup mode) ────────────
-  const startGame = useCallback(async (startFen: string = START_FEN) => {
+  const startGame = useCallback(async (startFen: string = START_FEN, colorOverride?: 'white' | 'black') => {
+    const color = colorOverride ?? playerColor;
     setFen(startFen);
     setCards([]);
     setLastMove(null);
@@ -297,7 +298,7 @@ export default function TutorialPage() {
     setGameOverInfo(null);
     setPhase('playing');
 
-    if (playerColor === 'black') {
+    if (color === 'black') {
       setEngineThinking(true);
       try {
         const { data } = await tutorialApi.engineFirstMove(difficulty, startFen);
@@ -353,7 +354,7 @@ export default function TutorialPage() {
     return (
       <PositionSetupBoard
         initialPlayerColor={playerColor}
-        onConfirm={(fen) => startGame(fen)}
+        onConfirm={(fen, color) => { setPlayerColor(color); startGame(fen, color); }}
         onCancel={() => setPhase('setup')}
       />
     );
