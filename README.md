@@ -85,10 +85,10 @@ docker compose up --build
 ```
 
 Services started:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:4000
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
+- **Frontend**: http://localhost:8001
+- **Backend API**: http://localhost:8000
+- **PostgreSQL**: localhost:7432
+- **Redis**: localhost:7379
 
 The database schema is applied automatically on first boot via the init script.
 
@@ -132,7 +132,7 @@ npm install
 npm run dev
 ```
 
-Frontend dev server: http://localhost:3000 (proxies API calls to backend on port 4000)
+Frontend dev server: http://localhost:5173 (proxies API calls to backend on port 7000)
 
 ---
 
