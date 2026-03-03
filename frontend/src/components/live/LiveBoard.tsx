@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, CSSProperties, ReactElement } from 'react';
+import { useEffect, useCallback, useState, useRef, CSSProperties, ReactElement } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess, Square } from 'chess.js';
 import { useLiveGameStore } from '../../store/liveGameStore';
@@ -71,6 +71,26 @@ export default function LiveBoard() {
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [optionSquares, setOptionSquares] = useState<Square[]>([]);
   const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
+  const [boardWidth, setBoardWidth] = useState(480);
+  const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragState.current = { startX: e.clientX, startWidth: boardWidth };
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!dragState.current) return;
+      const delta = ev.clientX - dragState.current.startX;
+      const next = Math.min(800, Math.max(280, dragState.current.startWidth + delta));
+      setBoardWidth(next);
+    };
+    const onMouseUp = () => {
+      dragState.current = null;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [boardWidth]);
 
   // Clear selection whenever FEN changes (after a move is confirmed)
   useEffect(() => {
@@ -286,19 +306,45 @@ export default function LiveBoard() {
           rating={opponentRating}
         />
 
-        {/* Chessboard */}
-        <div style={{ borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 32px rgba(0,0,0,0.5)' }}>
-          <Chessboard
-            position={fen}
-            onPieceDrop={onDrop}
-            onSquareClick={onSquareClick}
-            boardOrientation={flipped ? 'black' : 'white'}
-            boardWidth={480}
-            areArrowsAllowed
-            customBoardStyle={{ borderRadius: '0' }}
-            customSquareStyles={customSquareStyles}
-            animationDuration={150}
-          />
+        {/* Chessboard — resizable via bottom-right drag handle */}
+        <div style={{ position: 'relative', display: 'inline-block', borderRadius: '8px', overflow: 'visible', boxShadow: '0 4px 32px rgba(0,0,0,0.5)' }}>
+          <div style={{ borderRadius: '8px', overflow: 'hidden' }}>
+            <Chessboard
+              position={fen}
+              onPieceDrop={onDrop}
+              onSquareClick={onSquareClick}
+              boardOrientation={flipped ? 'black' : 'white'}
+              boardWidth={boardWidth}
+              areArrowsAllowed
+              customBoardStyle={{ borderRadius: '0' }}
+              customSquareStyles={customSquareStyles}
+              animationDuration={150}
+            />
+          </div>
+          {/* Resize grip */}
+          <div
+            onMouseDown={onResizeStart}
+            title="Drag to resize board"
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              right: 0,
+              width: 18,
+              height: 18,
+              cursor: 'nwse-resize',
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'flex-end',
+              padding: '3px',
+              zIndex: 10,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M11 1L1 11" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M11 5L5 11" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M11 9L9 11" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
         </div>
 
         {/* My clock (bottom) */}
