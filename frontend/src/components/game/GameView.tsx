@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -9,7 +9,7 @@ import MoveList from '../analysis/MoveList';
 import AnalysisSummary from '../analysis/AnalysisSummary';
 import AnalysisProgressBar from '../analysis/AnalysisProgressBar';
 import type { AnalysisMove } from '../../types';
-import { ArrowLeft, PlayCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, PlayCircle, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 export default function GameView() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +38,27 @@ export default function GameView() {
   const game = data?.game;
   const moves: AnalysisMove[] = data?.moves ?? [];
   const summary = data?.summary ?? {};
+
+  const goTo = useCallback((index: number) => setCurrentMoveIndex(index), []);
+  const goPrev = useCallback(() => setCurrentMoveIndex((i) => Math.max(-1, i - 1)), []);
+  const goNext = useCallback(
+    () => setCurrentMoveIndex((i) => Math.min(moves.length - 1, i + 1)),
+    [moves.length]
+  );
+  const goStart = useCallback(() => setCurrentMoveIndex(-1), []);
+  const goEnd = useCallback(() => setCurrentMoveIndex(moves.length - 1), [moves.length]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); goPrev(); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
+      if (e.key === 'Home')       { e.preventDefault(); goStart(); }
+      if (e.key === 'End')        { e.preventDefault(); goEnd(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goPrev, goNext, goStart, goEnd]);
 
   // Determine board FEN for current move
   const currentMove = currentMoveIndex >= 0 ? moves[currentMoveIndex] : null;
@@ -131,6 +152,47 @@ export default function GameView() {
               orientation="white"
             />
 
+            {/* Navigation buttons */}
+            {moves.length > 0 && (
+              <div style={styles.navBar}>
+                <button
+                  onClick={goStart}
+                  disabled={currentMoveIndex < 0}
+                  style={styles.navBtn}
+                  title="Start (Home)"
+                >
+                  <ChevronsLeft size={18} />
+                </button>
+                <button
+                  onClick={goPrev}
+                  disabled={currentMoveIndex < 0}
+                  style={styles.navBtn}
+                  title="Previous move (←)"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span style={styles.navCount}>
+                  {currentMoveIndex < 0 ? 'Start' : `${currentMoveIndex + 1} / ${moves.length}`}
+                </span>
+                <button
+                  onClick={goNext}
+                  disabled={currentMoveIndex >= moves.length - 1}
+                  style={styles.navBtn}
+                  title="Next move (→)"
+                >
+                  <ChevronRight size={18} />
+                </button>
+                <button
+                  onClick={goEnd}
+                  disabled={currentMoveIndex >= moves.length - 1}
+                  style={styles.navBtn}
+                  title="End (End)"
+                >
+                  <ChevronsRight size={18} />
+                </button>
+              </div>
+            )}
+
             {/* Move info panel */}
             {currentMove && (
               <div style={styles.moveInfo}>
@@ -154,7 +216,7 @@ export default function GameView() {
           <MoveList
             moves={moves}
             currentIndex={currentMoveIndex}
-            onSelect={setCurrentMoveIndex}
+            onSelect={goTo}
           />
         </>
       )}
@@ -234,6 +296,36 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 4,
     minWidth: 160,
+  },
+  navBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    background: '#1e293b',
+    border: '1px solid #334155',
+    borderRadius: 8,
+    padding: '8px 12px',
+    alignSelf: 'flex-end',
+    flexWrap: 'wrap' as const,
+  },
+  navBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#0f172a',
+    border: '1px solid #334155',
+    color: '#94a3b8',
+    borderRadius: 6,
+    width: 34,
+    height: 34,
+    cursor: 'pointer',
+    transition: 'background 0.15s',
+  },
+  navCount: {
+    color: '#64748b',
+    fontSize: 13,
+    minWidth: 70,
+    textAlign: 'center' as const,
   },
   center: {
     display: 'flex',
