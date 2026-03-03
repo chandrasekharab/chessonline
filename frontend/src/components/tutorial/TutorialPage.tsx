@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, CSSProperties } from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { useBoardThemeStore } from '../../store/boardThemeStore';
+import PositionSetupBoard from './PositionSetupBoard';
 import toast from 'react-hot-toast';
 import {
   tutorialApi,
@@ -22,7 +23,7 @@ const LABEL_ICONS: Record<string, string> = {
   inaccuracy: '⚠', mistake: '✗', blunder: '✗✗', missed_win: '☆',
 };
 
-type GamePhase = 'setup' | 'playing' | 'gameover';
+type GamePhase = 'setup' | 'position-setup' | 'playing' | 'gameover';
 
 interface MoveCard {
   key: string;
@@ -283,9 +284,9 @@ export default function TutorialPage() {
     }
   }, [hintLoading, engineThinking, phase, fen, playerColor, difficulty]);
 
-  // ── Start game ────────────────────────────────────────────────────────────
-  const startGame = useCallback(async () => {
-    setFen(START_FEN);
+  // ── Start game (supports custom FEN for position-setup mode) ────────────
+  const startGame = useCallback(async (startFen: string = START_FEN) => {
+    setFen(startFen);
     setCards([]);
     setLastMove(null);
     setSelectedSquare(null);
@@ -299,7 +300,7 @@ export default function TutorialPage() {
     if (playerColor === 'black') {
       setEngineThinking(true);
       try {
-        const { data } = await tutorialApi.engineFirstMove(difficulty);
+        const { data } = await tutorialApi.engineFirstMove(difficulty, startFen);
         const from = data.uci.slice(0, 2) as Square;
         const to = data.uci.slice(2, 4) as Square;
         setLastMove({ from, to });
@@ -346,8 +347,19 @@ export default function TutorialPage() {
     customSquareStyles[hintMove.to]   = { backgroundColor: 'rgba(34, 197, 94, 0.25)' };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SETUP SCREEN
+  // ─────────────────────────────────────────────────────────────────────────  // POSITION SETUP SCREEN
+  // ──────────────────────────────────────────────────────────────────
+  if (phase === 'position-setup') {
+    return (
+      <PositionSetupBoard
+        initialPlayerColor={playerColor}
+        onConfirm={(fen) => startGame(fen)}
+        onCancel={() => setPhase('setup')}
+      />
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────  // SETUP SCREEN
   // ─────────────────────────────────────────────────────────────────────────
   if (phase === 'setup') {
     return (
@@ -398,8 +410,14 @@ export default function TutorialPage() {
             </div>
           </div>
 
-          <button onClick={startGame} style={s.startBtn}>
+          <button onClick={() => startGame()} style={s.startBtn}>
             Start Game
+          </button>
+          <button
+            onClick={() => setPhase('position-setup')}
+            style={{ ...s.startBtn, background: '#1e3a5f', border: '1px solid #2563eb', marginTop: 10 }}
+          >
+            ♟ Set Up Custom Position
           </button>
         </div>
       </div>

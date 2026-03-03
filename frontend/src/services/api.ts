@@ -112,8 +112,8 @@ export const tutorialApi = {
   hint: (fen: string, playerColor: 'white' | 'black', difficulty: number) =>
     api.post<TutorialHintResponse>('/tutorial/hint', { fen, playerColor, difficulty }),
 
-  engineFirstMove: (difficulty: number) =>
-    api.post<TutorialFirstMoveResponse>('/tutorial/engine-first-move', { difficulty }),
+  engineFirstMove: (difficulty: number, fen?: string) =>
+    api.post<TutorialFirstMoveResponse>('/tutorial/engine-first-move', { difficulty, ...(fen ? { fen } : {}) }),
 };
 
 // ─── Puzzles ───────────────────────────────────────────────────────────────
