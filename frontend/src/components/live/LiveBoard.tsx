@@ -1,6 +1,6 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState, CSSProperties, ReactElement } from 'react';
 import { Chessboard } from 'react-chessboard';
-import { Square } from 'chess.js';
+import { Chess, Square } from 'chess.js';
 import { useLiveGameStore } from '../../store/liveGameStore';
 import { getSocket } from '../../services/socket';
 import PlayerClock from './PlayerClock';
@@ -13,21 +13,80 @@ import {
 } from '../../types';
 import toast from 'react-hot-toast';
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Get all legal destination squares for a piece on `square` given the current fen */
+function getLegalMoves(fen: string, square: Square): Square[] {
+  try {
+    const chess = new Chess(fen);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (chess.moves({ square, verbose: true }) as any[])
+      .map((m) => m.to as Square);
+  } catch {
+    return [];
+  }
+}
+
+/** Check if the piece on square belongs to the current player */
+function isMyPiece(fen: string, square: Square, myColor: 'white' | 'black'): boolean {
+  try {
+    const chess = new Chess(fen);
+    const piece = chess.get(square);
+    if (!piece) return false;
+    return (myColor === 'white' && piece.color === 'w') ||
+           (myColor === 'black' && piece.color === 'b');
+  } catch {
+    return false;
+  }
+}
+
+/** Is it this player's turn? */
+function isPlayerTurn(fen: string, myColor: 'white' | 'black'): boolean {
+  const turn = fen.split(' ')[1];
+  return (myColor === 'white' && turn === 'w') || (myColor === 'black' && turn === 'b');
+}
+
+/** Is this move a pawn promotion? */
+function isPromotion(fen: string, from: Square, to: Square): boolean {
+  try {
+    const chess = new Chess(fen);
+    const piece = chess.get(from);
+    if (!piece || piece.type !== 'p') return false;
+    return (piece.color === 'w' && to[1] === '8') || (piece.color === 'b' && to[1] === '1');
+  } catch {
+    return false;
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function LiveBoard() {
   const {
-    gameId, game, myColor, fen, moves, turn,
+    gameId, game, myColor, fen, moves,
     whiteTimeMs, blackTimeMs,
     drawOfferedBy, gameOver,
     updateMove, updateClock, setDrawOffer, setGameOver, reset,
   } = useLiveGameStore();
 
-  // Register socket listeners when game is active
+  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
+  const [optionSquares, setOptionSquares] = useState<Square[]>([]);
+  const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
+
+  // Clear selection whenever FEN changes (after a move is confirmed)
+  useEffect(() => {
+    setSelectedSquare(null);
+    setOptionSquares([]);
+  }, [fen]);
+
+  // ── Socket listeners ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!gameId) return;
     const socket = getSocket();
 
     const onMoveMade = (e: MoveMadeEvent) => {
       updateMove(e.fen, e.move, e.white_time_ms, e.black_time_ms, e.turn);
+      const uci = e.move.uci;
+      setLastMove({ from: uci.slice(0, 2) as Square, to: uci.slice(2, 4) as Square });
     };
 
     const onClockUpdate = (e: ClockUpdateEvent) => {
@@ -41,9 +100,7 @@ export default function LiveBoard() {
     const onDrawOffered = (e: DrawOfferedEvent) => {
       if (e.gameId === gameId) {
         setDrawOffer(e.by);
-        if (e.by !== myColor) {
-          toast('Your opponent offers a draw', { icon: '🤝' });
-        }
+        if (e.by !== myColor) toast('Your opponent offers a draw', { icon: '🤝' });
       }
     };
 
@@ -54,6 +111,8 @@ export default function LiveBoard() {
 
     const onIllegalMove = (e: { error: string }) => {
       toast.error(`Illegal move: ${e.error}`);
+      setSelectedSquare(null);
+      setOptionSquares([]);
     };
 
     socket.on('move_made', onMoveMade);
@@ -73,11 +132,62 @@ export default function LiveBoard() {
     };
   }, [gameId, myColor, updateMove, updateClock, setDrawOffer, setGameOver]);
 
+  // ── Emit a move to the server ─────────────────────────────────────────────
+  const emitMove = useCallback(
+    (from: Square, to: Square) => {
+      if (!gameId || !myColor) return;
+      const promotion = isPromotion(fen, from, to) ? 'q' : undefined;
+      const uci = `${from}${to}${promotion ?? ''}`;
+      getSocket().emit('make_move', { gameId, uci });
+      setSelectedSquare(null);
+      setOptionSquares([]);
+    },
+    [gameId, myColor, fen]
+  );
+
+  // ── Click-to-move handler ─────────────────────────────────────────────────
+  const onSquareClick = useCallback(
+    (square: Square) => {
+      if (!gameId || !myColor || game?.status !== 'active') return;
+      if (!isPlayerTurn(fen, myColor)) return;
+
+      // Case 1: A piece is already selected
+      if (selectedSquare) {
+        // Clicking a valid destination → move
+        if (optionSquares.includes(square)) {
+          emitMove(selectedSquare, square);
+          return;
+        }
+        // Clicking own piece → reselect
+        if (isMyPiece(fen, square, myColor)) {
+          const moves = getLegalMoves(fen, square);
+          setSelectedSquare(square);
+          setOptionSquares(moves);
+          return;
+        }
+        // Clicking empty or opponent square that isn't a valid move → deselect
+        setSelectedSquare(null);
+        setOptionSquares([]);
+        return;
+      }
+
+      // Case 2: No piece selected — select if own piece with legal moves
+      if (isMyPiece(fen, square, myColor)) {
+        const legalMoves = getLegalMoves(fen, square);
+        if (legalMoves.length > 0) {
+          setSelectedSquare(square);
+          setOptionSquares(legalMoves);
+        }
+      }
+    },
+    [gameId, myColor, game?.status, fen, selectedSquare, optionSquares, emitMove]
+  );
+
+  // ── Drag-and-drop handler (keeps existing drag support) ───────────────────
   const onDrop = useCallback(
     (sourceSquare: Square, targetSquare: Square, piece: string) => {
       if (!gameId || !myColor) return false;
-      if (myColor === 'white' && turn !== 'w') return false;
-      if (myColor === 'black' && turn !== 'b') return false;
+      if (!isPlayerTurn(fen, myColor)) return false;
 
       const promotion =
         (piece === 'wP' || piece === 'bP') &&
@@ -87,11 +197,47 @@ export default function LiveBoard() {
 
       const uci = `${sourceSquare}${targetSquare}${promotion ?? ''}`;
       getSocket().emit('make_move', { gameId, uci });
+      setSelectedSquare(null);
+      setOptionSquares([]);
       return true;
     },
-    [gameId, myColor, turn]
+    [gameId, myColor, fen]
   );
 
+  // ── Custom square styles ──────────────────────────────────────────────────
+  const customSquareStyles: Record<string, CSSProperties> = {};
+
+  // Last move highlight (subtle yellow tint)
+  if (lastMove) {
+    customSquareStyles[lastMove.from] = { backgroundColor: 'rgba(255, 214, 10, 0.25)' };
+    customSquareStyles[lastMove.to]   = { backgroundColor: 'rgba(255, 214, 10, 0.35)' };
+  }
+
+  // Selected piece highlight (blue)
+  if (selectedSquare) {
+    customSquareStyles[selectedSquare] = { backgroundColor: 'rgba(59, 130, 246, 0.55)' };
+  }
+
+  // Legal move dots / capture rings
+  for (const sq of optionSquares) {
+    const chess = new Chess(fen);
+    const hasEnemy = chess.get(sq) !== null;
+    if (hasEnemy) {
+      // Capture: hollow ring around the square
+      customSquareStyles[sq] = {
+        background: 'radial-gradient(circle, transparent 55%, rgba(59,130,246,0.6) 55%)',
+        borderRadius: '50%',
+      };
+    } else {
+      // Empty square: filled dot in the centre
+      customSquareStyles[sq] = {
+        background: 'radial-gradient(circle, rgba(59,130,246,0.6) 28%, transparent 28%)',
+        borderRadius: '50%',
+      };
+    }
+  }
+
+  // ── Controls ──────────────────────────────────────────────────────────────
   const resign = () => {
     if (!gameId) return;
     if (!window.confirm('Are you sure you want to resign?')) return;
@@ -126,7 +272,7 @@ export default function LiveBoard() {
   const opponentRating = myColor === 'white' ? game.black_rating : game.white_rating;
   const myTimeMs = myColor === 'white' ? whiteTimeMs : blackTimeMs;
   const oppTimeMs = myColor === 'white' ? blackTimeMs : whiteTimeMs;
-  const isMyTurn = (myColor === 'white' && turn === 'w') || (myColor === 'black' && turn === 'b');
+  const isMyTurn = isPlayerTurn(fen, myColor!);
 
   return (
     <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', justifyContent: 'center', padding: '24px', flexWrap: 'wrap' }}>
@@ -145,10 +291,12 @@ export default function LiveBoard() {
           <Chessboard
             position={fen}
             onPieceDrop={onDrop}
+            onSquareClick={onSquareClick}
             boardOrientation={flipped ? 'black' : 'white'}
             boardWidth={480}
             areArrowsAllowed
             customBoardStyle={{ borderRadius: '0' }}
+            customSquareStyles={customSquareStyles}
             animationDuration={150}
           />
         </div>
@@ -195,7 +343,7 @@ export default function LiveBoard() {
       <div style={{ minWidth: '180px', maxHeight: '520px', overflow: 'auto', background: '#1e293b', borderRadius: '8px', padding: '12px' }}>
         <h3 style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Moves</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr', gap: '2px 8px' }}>
-          {moves.reduce<JSX.Element[]>((acc, m, i) => {
+          {moves.reduce<ReactElement[]>((acc: ReactElement[], m: { san: string; uci: string }, i: number) => {
             if (i % 2 === 0) {
               acc.push(
                 <span key={`n${i}`} style={{ color: '#475569', fontSize: '13px', lineHeight: '24px' }}>
@@ -203,13 +351,13 @@ export default function LiveBoard() {
                 </span>
               );
               acc.push(
-                <span key={`w${i}`} style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: '24px', cursor: 'default' }}>
+                <span key={`w${i}`} style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: '24px' }}>
                   {m.san}
                 </span>
               );
               if (i + 1 < moves.length) {
                 acc.push(
-                  <span key={`b${i}`} style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: '24px', cursor: 'default' }}>
+                  <span key={`b${i}`} style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: '24px' }}>
                     {moves[i + 1].san}
                   </span>
                 );
