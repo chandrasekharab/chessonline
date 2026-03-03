@@ -1,4 +1,4 @@
-import { useState, useCallback, CSSProperties } from 'react';
+import { useState, useCallback, useRef, CSSProperties } from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { useBoardThemeStore } from '../../store/boardThemeStore';
@@ -8,13 +8,16 @@ type PieceCode = string; // e.g. 'wK', 'bN'
 type BoardPosition = Record<string, PieceCode>;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PALETTE = [
+const WHITE_PIECES = [
   { code: 'wK', sym: '♔', label: 'White King' },
   { code: 'wQ', sym: '♕', label: 'White Queen' },
   { code: 'wR', sym: '♖', label: 'White Rook' },
   { code: 'wB', sym: '♗', label: 'White Bishop' },
   { code: 'wN', sym: '♘', label: 'White Knight' },
   { code: 'wP', sym: '♙', label: 'White Pawn' },
+];
+
+const BLACK_PIECES = [
   { code: 'bK', sym: '♚', label: 'Black King' },
   { code: 'bQ', sym: '♛', label: 'Black Queen' },
   { code: 'bR', sym: '♜', label: 'Black Rook' },
@@ -22,6 +25,8 @@ const PALETTE = [
   { code: 'bN', sym: '♞', label: 'Black Knight' },
   { code: 'bP', sym: '♟', label: 'Black Pawn' },
 ];
+
+const ALL_PIECES = [...WHITE_PIECES, ...BLACK_PIECES];
 
 const START_POS: BoardPosition = {
   a1: 'wR', b1: 'wN', c1: 'wB', d1: 'wQ', e1: 'wK', f1: 'wB', g1: 'wN', h1: 'wR',
@@ -49,8 +54,15 @@ function positionToFen(pos: BoardPosition, turn: 'w' | 'b'): string | null {
     if (empty > 0) fenBoard += empty;
     if (rank > 1) fenBoard += '/';
   }
-  const fen = `${fenBoard} ${turn} - - 0 1`;
+  const fen = fenBoard + ' ' + turn + ' - - 0 1';
   try { new Chess(fen); return fen; } catch { return null; }
+}
+
+// Compute square label from row/col (0-indexed), respecting board flip
+function rowColToSquare(row: number, col: number, flipped: boolean): Square {
+  const file = flipped ? 'hgfedcba'[col] : 'abcdefgh'[col];
+  const rank = flipped ? row + 1 : 8 - row;
+  return (file + rank) as Square;
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -64,36 +76,75 @@ interface Props {
 export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCancel }: Props) {
   const theme = useBoardThemeStore((s) => s.getTheme());
   const [position, setPosition] = useState<BoardPosition>({ ...START_POS });
-  const [brush, setBrush] = useState<PieceCode | null>(null); // null = eraser
   const [playerColor, setPlayerColor] = useState<'white' | 'black'>(initialPlayerColor);
   const [turn, setTurn] = useState<'w' | 'b'>(initialPlayerColor === 'white' ? 'w' : 'b');
-  const [boardWidth] = useState(440);
+  const [boardWidth] = useState(460);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Place / remove piece on click ──────────────────────────────────────────
-  const onSquareClick = useCallback((square: Square) => {
-    setError(null);
-    setPosition((prev) => {
-      const next = { ...prev };
-      if (brush === null || prev[square] === brush) {
-        delete next[square]; // eraser, or clicking placed piece again removes it
-      } else {
-        next[square] = brush;
-      }
-      return next;
-    });
-  }, [brush]);
+  // ── Drag-from-palette state ────────────────────────────────────────────────
+  const [paletteDrag, setPaletteDrag] = useState<PieceCode | null>(null);
+  const [hoverSquare, setHoverSquare] = useState<string | null>(null);
+  const dragPieceRef = useRef<PieceCode | null>(null);
 
-  // ── Drag pieces around the board during setup ──────────────────────────────
+  const flipped = playerColor === 'black';
+
+  // ── Drag-from-palette: start ───────────────────────────────────────────────
+  const onPaletteDragStart = (e: React.DragEvent, code: PieceCode) => {
+    dragPieceRef.current = code;
+    setPaletteDrag(code);
+    const ghost = document.createElement('div');
+    ghost.style.cssText = 'position:fixed;top:-999px;left:-999px;font-size:40px;line-height:1;';
+    ghost.textContent = ALL_PIECES.find((p) => p.code === code)?.sym ?? '';
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 20, 20);
+    setTimeout(() => document.body.removeChild(ghost), 0);
+  };
+
+  const onPaletteDragEnd = () => {
+    setPaletteDrag(null);
+    setHoverSquare(null);
+    dragPieceRef.current = null;
+  };
+
+  // ── Overlay cell handlers (drop targets over the board) ────────────────────
+  const onOverlayDragOver = (e: React.DragEvent, row: number, col: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setHoverSquare(rowColToSquare(row, col, flipped));
+  };
+
+  const onOverlayDrop = (row: number, col: number) => {
+    const piece = dragPieceRef.current;
+    if (!piece) return;
+    const sq = rowColToSquare(row, col, flipped);
+    setError(null);
+    setPosition((prev) => ({ ...prev, [sq]: piece }));
+    setPaletteDrag(null);
+    setHoverSquare(null);
+    dragPieceRef.current = null;
+  };
+
+  // ── Drag pieces already on the board to reposition ────────────────────────
   const onPieceDrop = useCallback((from: Square, to: Square, piece: string) => {
     setError(null);
     setPosition((prev) => {
       const next = { ...prev };
       delete next[from];
-      next[to] = piece; // react-chessboard passes piece as 'wK', 'bN' etc.
+      next[to] = piece;
       return next;
     });
     return true;
+  }, []);
+
+  // ── Click a board piece to remove it ─────────────────────────────────────
+  const onSquareClick = useCallback((square: Square) => {
+    setError(null);
+    setPosition((prev) => {
+      if (!prev[square]) return prev;
+      const next = { ...prev };
+      delete next[square];
+      return next;
+    });
   }, []);
 
   const handleClear = () => { setPosition({}); setError(null); };
@@ -108,34 +159,84 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
     onConfirm(fen, playerColor);
   };
 
-  // ── Highlight selected brush square ───────────────────────────────────────
+  // ── Highlight hovered square during palette drag ───────────────────────────
   const customSquareStyles: Record<string, CSSProperties> = {};
-  if (brush) {
-    // faint green on every square that already has the selected piece (shows where it's placed)
-    Object.entries(position).forEach(([sq, pc]) => {
-      if (pc === brush) customSquareStyles[sq] = { backgroundColor: 'rgba(34,197,94,0.3)' };
-    });
+  if (hoverSquare) {
+    customSquareStyles[hoverSquare] = { backgroundColor: 'rgba(59,130,246,0.55)' };
   }
 
   return (
     <div style={s.page}>
       <div style={s.container}>
+
         {/* ── Title ── */}
         <div style={s.titleRow}>
           <h2 style={s.title}>Set Up Custom Position</h2>
           <p style={s.subtitle}>
-            Select a piece from the palette, then click a square to place it.
-            Click an occupied square to remove it. Drag pieces to reposition.
+            Drag any piece from the tray below onto the board.&nbsp;
+            Drag pieces on the board to reposition them.&nbsp;
+            Click a piece on the board to remove it.
           </p>
         </div>
 
+        {/* ── Piece Tray ── */}
+        <div style={s.tray}>
+          <div style={s.trayGroup}>
+            <p style={s.trayLabel}>White pieces</p>
+            <div style={s.trayRow}>
+              {WHITE_PIECES.map((p) => (
+                <div
+                  key={p.code}
+                  title={p.label + ' — drag onto board'}
+                  draggable
+                  onDragStart={(e) => onPaletteDragStart(e, p.code)}
+                  onDragEnd={onPaletteDragEnd}
+                  style={{
+                    ...s.trayPiece,
+                    color: '#f8fafc',
+                    textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                    ...(paletteDrag === p.code ? s.trayPieceDragging : {}),
+                  }}
+                >
+                  {p.sym}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={s.traySep} />
+
+          <div style={s.trayGroup}>
+            <p style={s.trayLabel}>Black pieces</p>
+            <div style={s.trayRow}>
+              {BLACK_PIECES.map((p) => (
+                <div
+                  key={p.code}
+                  title={p.label + ' — drag onto board'}
+                  draggable
+                  onDragStart={(e) => onPaletteDragStart(e, p.code)}
+                  onDragEnd={onPaletteDragEnd}
+                  style={{
+                    ...s.trayPiece,
+                    color: '#7dd3fc',
+                    ...(paletteDrag === p.code ? s.trayPieceDragging : {}),
+                  }}
+                >
+                  {p.sym}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div style={s.layout}>
-          {/* ── Board ── */}
-          <div>
+
+          {/* ── Board with drag-overlay ── */}
+          <div style={{ position: 'relative', width: boardWidth, height: boardWidth, flexShrink: 0 }}>
             <Chessboard
               position={position}
               boardWidth={boardWidth}
-              boardOrientation={playerColor === 'black' ? 'black' : 'white'}
+              boardOrientation={flipped ? 'black' : 'white'}
               onSquareClick={onSquareClick}
               onPieceDrop={onPieceDrop}
               isDraggablePiece={() => true}
@@ -146,52 +247,49 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
               areArrowsAllowed={false}
               animationDuration={80}
             />
+
+            {/* Transparent 8×8 overlay — captures palette drops */}
+            {paletteDrag && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0, left: 0,
+                  width: boardWidth, height: boardWidth,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(8, 1fr)',
+                  gridTemplateRows: 'repeat(8, 1fr)',
+                  zIndex: 20,
+                  cursor: 'copy',
+                  borderRadius: 6,
+                }}
+                onDragLeave={() => setHoverSquare(null)}
+              >
+                {Array.from({ length: 64 }, (_, i) => {
+                  const row = Math.floor(i / 8);
+                  const col = i % 8;
+                  return (
+                    <div
+                      key={i}
+                      onDragOver={(e) => onOverlayDragOver(e, row, col)}
+                      onDrop={() => onOverlayDrop(row, col)}
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* ── Right panel ── */}
           <div style={s.panel}>
-            {/* Piece palette */}
-            <div style={s.section}>
-              <p style={s.sectionLabel}>Piece Palette</p>
-              <div style={s.paletteGrid}>
-                {PALETTE.map((p) => (
-                  <button
-                    key={p.code}
-                    title={p.label}
-                    onClick={() => setBrush(brush === p.code ? null : p.code)}
-                    style={{
-                      ...s.palBtn,
-                      ...(brush === p.code ? s.palBtnActive : {}),
-                      color: p.code[0] === 'w' ? '#f8fafc' : '#94a3b8',
-                    }}
-                  >
-                    {p.sym}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setBrush(null)}
-                style={{ ...s.eraserBtn, ...(brush === null ? s.eraserBtnActive : {}) }}
-              >
-                ✕ Eraser
-              </button>
-              {brush && (
-                <p style={s.brushHint}>
-                  Placing: {PALETTE.find((p) => p.code === brush)?.label}
-                </p>
-              )}
-            </div>
 
             {/* Play as */}
             <div style={s.section}>
               <p style={s.sectionLabel}>Play as</p>
               <div style={s.turnRow}>
                 {(['white', 'black'] as const).map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setPlayerColor(c)}
-                    style={{ ...s.turnBtn, ...(playerColor === c ? s.turnBtnActive : {}) }}
-                  >
+                  <button key={c} onClick={() => setPlayerColor(c)}
+                    style={{ ...s.turnBtn, ...(playerColor === c ? s.turnBtnActive : {}) }}>
                     {c === 'white' ? '♔ White' : '♚ Black'}
                   </button>
                 ))}
@@ -203,11 +301,8 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
               <p style={s.sectionLabel}>Side to Move First</p>
               <div style={s.turnRow}>
                 {(['w', 'b'] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTurn(t)}
-                    style={{ ...s.turnBtn, ...(turn === t ? s.turnBtnActive : {}) }}
-                  >
+                  <button key={t} onClick={() => setTurn(t)}
+                    style={{ ...s.turnBtn, ...(turn === t ? s.turnBtnActive : {}) }}>
                     {t === 'w' ? '♔ White' : '♚ Black'}
                   </button>
                 ))}
@@ -221,6 +316,15 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
                 <button onClick={handleReset} style={s.ghostBtn}>↺ Reset to Start</button>
                 <button onClick={handleClear} style={s.ghostBtn}>⬜ Clear Board</button>
               </div>
+            </div>
+
+            {/* Hint card */}
+            <div style={s.hintBox}>
+              <p style={s.hintText}>
+                💡 <strong>Drag</strong> pieces from the tray onto the board.<br />
+                <strong>Drag</strong> board pieces to reposition them.<br />
+                <strong>Click</strong> a board piece to remove it.
+              </p>
             </div>
 
             {/* Error */}
@@ -271,6 +375,55 @@ const s: Record<string, CSSProperties> = {
     margin: 0,
     lineHeight: 1.6,
   },
+  tray: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 20,
+    background: '#1e293b',
+    border: '1px solid #334155',
+    borderRadius: 12,
+    padding: '14px 20px',
+    flexWrap: 'wrap',
+  },
+  trayGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  trayLabel: {
+    margin: 0,
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    color: '#64748b',
+  },
+  trayRow: {
+    display: 'flex',
+    gap: 6,
+  },
+  trayPiece: {
+    fontSize: 36,
+    lineHeight: 1,
+    padding: '6px 8px',
+    background: '#0f172a',
+    border: '2px solid #334155',
+    borderRadius: 8,
+    cursor: 'grab',
+    userSelect: 'none',
+    transition: 'border-color 0.15s, transform 0.1s, opacity 0.1s',
+  },
+  trayPieceDragging: {
+    opacity: 0.4,
+    borderColor: '#3b82f6',
+    transform: 'scale(0.9)',
+  },
+  traySep: {
+    width: 1,
+    alignSelf: 'stretch',
+    background: '#334155',
+    margin: '4px 0',
+  },
   layout: {
     display: 'flex',
     gap: 28,
@@ -280,11 +433,10 @@ const s: Record<string, CSSProperties> = {
   panel: {
     flex: 1,
     minWidth: 240,
-    maxWidth: 320,
+    maxWidth: 300,
     display: 'flex',
     flexDirection: 'column',
-    gap: 20,
-    minHeight: 440,
+    gap: 16,
   },
   section: {
     background: '#1e293b',
@@ -300,48 +452,17 @@ const s: Record<string, CSSProperties> = {
     letterSpacing: '0.06em',
     margin: '0 0 10px',
   },
-  paletteGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(6, 1fr)',
-    gap: 6,
-    marginBottom: 10,
+  hintBox: {
+    padding: '10px 14px',
+    background: '#0f1f0f',
+    border: '1px solid #166534',
+    borderRadius: 8,
   },
-  palBtn: {
-    fontSize: 22,
-    background: '#0f172a',
-    border: '2px solid #334155',
-    borderRadius: 6,
-    cursor: 'pointer',
-    padding: '4px 0',
-    lineHeight: 1,
-    transition: 'border-color 0.15s, background 0.15s',
-  },
-  palBtnActive: {
-    border: '2px solid #3b82f6',
-    background: '#1e3a5f',
-  },
-  eraserBtn: {
-    width: '100%',
-    padding: '6px',
-    background: '#0f172a',
-    border: '2px solid #334155',
-    borderRadius: 6,
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: 'pointer',
-    marginTop: 2,
-  },
-  eraserBtnActive: {
-    border: '2px solid #ef4444',
-    color: '#ef4444',
-    background: '#1f0a0a',
-  },
-  brushHint: {
-    margin: '8px 0 0',
+  hintText: {
+    margin: 0,
     fontSize: 12,
-    color: '#4ade80',
-    lineHeight: 1.4,
+    color: '#86efac',
+    lineHeight: 1.7,
   },
   turnRow: {
     display: 'flex',
