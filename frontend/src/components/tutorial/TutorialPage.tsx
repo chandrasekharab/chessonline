@@ -70,7 +70,7 @@ export default function TutorialPage() {
   const [cards, setCards] = useState<MoveCard[]>([]);
   const [engineThinking, setEngineThinking] = useState(false);
   const [gameOverInfo, setGameOverInfo] = useState<{ winner: string; reason: string } | null>(null);
-  const [hintSquare, setHintSquare] = useState<Square | null>(null);
+  const [hintMove, setHintMove] = useState<{ from: Square; to: Square } | null>(null);
   const [hintLoading, setHintLoading] = useState(false);
 
   // Wrong-move arrow (shown after inaccuracy / mistake / blunder)
@@ -166,7 +166,7 @@ export default function TutorialPage() {
     setUndoHistory((prev) => [...prev, snapshot]);
     setSelectedSquare(null);
     setOptionSquares([]);
-    setHintSquare(null);
+    setHintMove(null);
     setWrongMoveArrow(null);
     setEngineThinking(true);
     setLastMove({ from, to });
@@ -201,6 +201,18 @@ export default function TutorialPage() {
     if (engineThinking || phase !== 'playing') return;
     if (!isMyTurn(fen, playerColor)) return;
 
+    // If a hint is active and user clicks the hinted from-square, auto-execute the suggested move
+    if (hintMove && square === hintMove.from) {
+      setHintMove(null);
+      setSelectedSquare(null);
+      setOptionSquares([]);
+      submitMove(hintMove.from, hintMove.to);
+      return;
+    }
+
+    // Any other click dismisses the hint
+    if (hintMove) setHintMove(null);
+
     if (selectedSquare) {
       if (optionSquares.includes(square)) {
         submitMove(selectedSquare, square);
@@ -224,7 +236,7 @@ export default function TutorialPage() {
         setOptionSquares(targets);
       }
     }
-  }, [engineThinking, phase, fen, playerColor, selectedSquare, optionSquares, submitMove]);
+  }, [engineThinking, phase, fen, playerColor, hintMove, selectedSquare, optionSquares, submitMove]);
 
   // ── Drag-and-drop ─────────────────────────────────────────────────────────
   const onDrop = useCallback((from: Square, to: Square) => {
@@ -243,7 +255,7 @@ export default function TutorialPage() {
     setCards(prev.cards);
     setLastMove(prev.lastMove);
     setWrongMoveArrow(null);
-    setHintSquare(null);
+    setHintMove(null);
     setSelectedSquare(null);
     setOptionSquares([]);
     if (phase === 'gameover') setPhase('playing');
@@ -253,12 +265,15 @@ export default function TutorialPage() {
   const requestHint = useCallback(async () => {
     if (hintLoading || engineThinking || phase !== 'playing') return;
     setHintLoading(true);
-    setHintSquare(null);
+    setHintMove(null);
     try {
       const { data } = await tutorialApi.hint(fen, playerColor, difficulty);
       const from = data.best_move_uci.slice(0, 2) as Square;
-      setHintSquare(from);
-      toast(data.explanation, { duration: 5000, icon: '💡' });
+      const to   = data.best_move_uci.slice(2, 4) as Square;
+      setHintMove({ from, to });
+      setSelectedSquare(null);
+      setOptionSquares([]);
+      toast('💡 ' + data.explanation + ' — click the green piece to play it.', { duration: 6000 });
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -273,7 +288,7 @@ export default function TutorialPage() {
     setLastMove(null);
     setSelectedSquare(null);
     setOptionSquares([]);
-    setHintSquare(null);
+    setHintMove(null);
     setWrongMoveArrow(null);
     setUndoHistory([]);
     setGameOverInfo(null);
@@ -324,8 +339,9 @@ export default function TutorialPage() {
       ? { background: 'radial-gradient(circle, transparent 55%, rgba(59,130,246,0.6) 55%)', borderRadius: '50%' }
       : { background: 'radial-gradient(circle, rgba(59,130,246,0.6) 28%, transparent 28%)', borderRadius: '50%' };
   }
-  if (hintSquare) {
-    customSquareStyles[hintSquare] = { backgroundColor: 'rgba(34, 197, 94, 0.5)' };
+  if (hintMove) {
+    customSquareStyles[hintMove.from] = { backgroundColor: 'rgba(34, 197, 94, 0.6)', cursor: 'pointer' };
+    customSquareStyles[hintMove.to]   = { backgroundColor: 'rgba(34, 197, 94, 0.25)' };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
