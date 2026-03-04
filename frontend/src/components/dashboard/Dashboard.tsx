@@ -24,7 +24,7 @@ export default function Dashboard() {
             My Games
           </h1>
           <p style={styles.subtitle}>
-            Welcome back, <strong style={{ color: '#f1f5f9' }}>{user?.email}</strong>
+            Welcome back, <strong style={{ color: 'var(--text-1)' }}>{user?.email}</strong>
           </p>
         </div>
         <button
@@ -73,13 +73,13 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: 24,
     fontWeight: 700,
-    color: '#f8fafc',
+    color: 'var(--text-1)',
     display: 'flex',
     alignItems: 'center',
     marginBottom: 4,
   },
   subtitle: {
-    color: '#64748b',
+    color: 'var(--text-4)',
     fontSize: 14,
   },
   uploadBtn: {
@@ -97,7 +97,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   loading: {
     textAlign: 'center',
-    color: '#64748b',
+    color: 'var(--text-4)',
     padding: 60,
   },
 };

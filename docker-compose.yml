@@ -11,6 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./backend/db/ai_explanation_migration.sql:/docker-entrypoint-initdb.d/02_ai_explanation_migration.sql
     ports:
       - "7432:5432"
     healthcheck:
@@ -58,6 +59,21 @@ services:
       ENGINE_MAX_CONCURRENT: 2
       MAX_FILE_SIZE_MB: 5
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8001}
+      # ── AI Explanation Engine ────────────────────────────────
+      AI_EXPLANATIONS_ENABLED: ${AI_EXPLANATIONS_ENABLED:-true}
+      LLM_PROVIDER: ${LLM_PROVIDER:-custom}
+      LLM_MODEL: ${LLM_MODEL:-local-model}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-300}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.4}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-lm-studio}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      EXPLANATION_MIN_DROP_CP: ${EXPLANATION_MIN_DROP_CP:-100}
+    extra_hosts:
+      # Allows containers to reach LM Studio (or any service) on the host machine.
+      # Docker Desktop on macOS/Windows adds this automatically;
+      # on Linux set: DOCKER_HOST_IP=$(ip route | awk '/^default/{print $3}')
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:7000"
     healthcheck:
@@ -66,7 +82,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # ─── Analysis Worker ────────────────────────────────────────────────────────
+  # ─── Analysis Worker ──────────────────────────────────────────────────────── ────────────────────────────────────────────────────────
   worker:
     build:
       context: ./backend
@@ -86,6 +102,18 @@ services:
       STOCKFISH_PATH: /usr/games/stockfish
       ENGINE_DEPTH: 18
       ENGINE_MAX_CONCURRENT: 2
+      # ── AI Explanation Engine ────────────────────────────────
+      AI_EXPLANATIONS_ENABLED: ${AI_EXPLANATIONS_ENABLED:-true}
+      LLM_PROVIDER: ${LLM_PROVIDER:-custom}
+      LLM_MODEL: ${LLM_MODEL:-local-model}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-300}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.4}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-lm-studio}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      EXPLANATION_MIN_DROP_CP: ${EXPLANATION_MIN_DROP_CP:-100}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     deploy:
       replicas: 1
       resources:

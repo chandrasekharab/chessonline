@@ -4,6 +4,7 @@ import { Chessboard } from 'react-chessboard';
 import { useBoardThemeStore } from '../../store/boardThemeStore';
 import toast from 'react-hot-toast';
 import { puzzleApi, PuzzlePublic, PuzzleMoveResult, getErrorMessage } from '../../services/api';
+import AIPuzzleExplainer from '../analysis/AIPuzzleExplainer';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ export default function PuzzlePage() {
   const [solutionIndex, setSolutionIndex] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [revealedSolution, setRevealedSolution] = useState<string | null>(null);
+  const [solutionUCI, setSolutionUCI] = useState<string | null>(null);
   const [engineThinking, setEngineThinking] = useState(false);
   const [stats, setStats]       = useState<{ solved: number; attempted: number; accuracy: number } | null>(null);
   const [filterDifficulty, setFilterDifficulty] = useState<number | undefined>(undefined);
@@ -82,6 +84,7 @@ export default function PuzzlePage() {
     setPuzzle(null);
     setFeedback('');
     setRevealedSolution(null);
+    setSolutionUCI(null);
     setSelected(null);
     setOptionSquares([]);
     setLastMove(null);
@@ -158,6 +161,7 @@ export default function PuzzlePage() {
 
       if (data.solved) {
         setPhase('solved');
+        setSolutionUCI(data.solution_uci ?? null);
         toast.success('🎉 Puzzle Solved!', { duration: 3000 });
         loadStats();
         return;
@@ -189,6 +193,7 @@ export default function PuzzlePage() {
     try {
       const res = await puzzleApi.resign(puzzle.id);
       setRevealedSolution(res.data.solution_uci);
+      setSolutionUCI(res.data.solution_uci);
       setPhase('resigned');
       loadStats();
     } catch (err) {
@@ -285,8 +290,8 @@ export default function PuzzlePage() {
         {feedback && (
           <div style={{
             ...s.feedbackBar,
-            background: phase === 'solved' ? '#14532d' : phase === 'resigned' ? '#451a03' : '#1e293b',
-            borderColor: phase === 'solved' ? '#16a34a' : phase === 'resigned' ? '#b45309' : '#334155',
+            background: phase === 'solved' ? '#14532d' : phase === 'resigned' ? '#451a03' : 'var(--bg-elevated)',
+            borderColor: phase === 'solved' ? '#16a34a' : phase === 'resigned' ? '#b45309' : 'var(--border-strong)',
           }}>
             {feedback}
           </div>
@@ -303,7 +308,7 @@ export default function PuzzlePage() {
             </button>
           )}
           {engineThinking && (
-            <span style={{ color: '#94a3b8', fontSize: 14 }}>Engine is replying…</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 14 }}>Engine is replying…</span>
           )}
         </div>
       </div>
@@ -333,9 +338,9 @@ export default function PuzzlePage() {
                   fontSize: 13,
                   cursor: 'pointer',
                   border: '1px solid',
-                  borderColor: filterDifficulty === d ? '#f59e0b' : '#334155',
-                  background:  filterDifficulty === d ? '#78350f' : '#1e293b',
-                  color:       filterDifficulty === d ? '#fef3c7' : '#94a3b8',
+                  borderColor: filterDifficulty === d ? '#f59e0b' : 'var(--border-strong)',
+                  background:  filterDifficulty === d ? '#78350f' : 'var(--bg-elevated)',
+                  color:       filterDifficulty === d ? '#fef3c7' : 'var(--text-3)',
                 }}
               >
                 {d ? DIFF_LABELS[d] : 'All'}
@@ -346,7 +351,7 @@ export default function PuzzlePage() {
 
         {/* Puzzle card */}
         {phase === 'loading' && (
-          <div style={{ color: '#94a3b8', padding: '24px 0' }}>Loading puzzle…</div>
+          <div style={{ color: 'var(--text-3)', padding: '24px 0' }}>Loading puzzle…</div>
         )}
         {puzzle && (
           <div style={s.puzzleCard}>
@@ -354,7 +359,7 @@ export default function PuzzlePage() {
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <Tag label={THEME_LABELS[puzzle.theme] ?? puzzle.theme} color="#f59e0b" bg="#451a03" />
               <Tag label={DIFF_LABELS[puzzle.difficulty]} color="#60a5fa" bg="#0c2340" />
-              <Tag label={playerColor === 'white' ? '⬜ White to move' : '⬛ Black to move'} color="#e2e8f0" bg="#1e293b" />
+              <Tag label={playerColor === 'white' ? '⬜ White to move' : '⬛ Black to move'} color="var(--text-2)" bg="var(--bg-elevated)" />
             </div>
             <p style={s.desc}>{puzzle.description}</p>
 
@@ -367,14 +372,14 @@ export default function PuzzlePage() {
                     key={i}
                     style={{
                       width: 12, height: 12, borderRadius: '50%',
-                      background: done ? '#22c55e' : i === Math.floor(solutionIndex / 2) && phase === 'playing' ? '#f59e0b' : '#334155',
+                      background: done ? '#22c55e' : i === Math.floor(solutionIndex / 2) && phase === 'playing' ? '#f59e0b' : 'var(--border-strong)',
                     }}
                   />
                 );
               })}
             </div>
             {puzzle.total_player_moves > 1 && (
-              <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+              <div style={{ color: 'var(--text-4)', fontSize: 12, marginTop: 4 }}>
                 Move {Math.floor(solutionIndex / 2) + 1} of {puzzle.total_player_moves}
               </div>
             )}
@@ -391,8 +396,8 @@ export default function PuzzlePage() {
                 margin: '2px 4px',
                 padding: '2px 8px',
                 borderRadius: 4,
-                background: i % 2 === 0 ? '#1e3a5f' : '#1e293b',
-                color: '#e2e8f0',
+                background: i % 2 === 0 ? '#1e3a5f' : 'var(--bg-elevated)',
+                color: 'var(--text-2)',
                 fontSize: 13,
                 fontFamily: 'monospace',
               }}>{mv}</span>
@@ -406,6 +411,15 @@ export default function PuzzlePage() {
             🎉 Puzzle Solved!
           </div>
         )}
+
+        {/* AI Puzzle Explainer — shown after solved or resigned */}
+        {(phase === 'solved' || phase === 'resigned') && puzzle && solutionUCI && (
+          <AIPuzzleExplainer
+            fen={puzzle.fen}
+            solution={solutionUCI.split(' ')}
+            tags={[puzzle.theme]}
+          />
+        )}
       </div>
     </div>
   );
@@ -417,7 +431,7 @@ function StatBadge({ label, value, color }: { label: string; value: string | num
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{ color, fontWeight: 700, fontSize: 20 }}>{value}</div>
-      <div style={{ color: '#64748b', fontSize: 12 }}>{label}</div>
+      <div style={{ color: 'var(--text-3)', fontSize: 12 }}>{label}</div>
     </div>
   );
 }
@@ -439,7 +453,7 @@ const s: Record<string, React.CSSProperties> = {
     gap: 28,
     padding: '24px 32px',
     minHeight: 'calc(100vh - 56px)',
-    background: '#0f172a',
+    background: 'var(--bg-app)',
     alignItems: 'flex-start',
     flexWrap: 'wrap',
   },
@@ -451,8 +465,8 @@ const s: Record<string, React.CSSProperties> = {
   resizeHandle: {
     width: 8,
     cursor: 'col-resize',
-    background: '#1e293b',
-    borderLeft: '2px solid #334155',
+    background: 'var(--bg-elevated)',
+    borderLeft: '2px solid var(--border-strong)',
     borderRadius: '0 4px 4px 0',
     transition: 'background 0.15s',
     flexShrink: 0,
@@ -461,7 +475,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '10px 14px',
     borderRadius: 6,
     border: '1px solid',
-    color: '#e2e8f0',
+    color: 'var(--text-2)',
     fontSize: 14,
     fontWeight: 500,
   },
@@ -483,9 +497,9 @@ const s: Record<string, React.CSSProperties> = {
   btnGhost: {
     padding: '7px 16px',
     borderRadius: 6,
-    border: '1px solid #334155',
+    border: '1px solid var(--border-strong)',
     background: 'transparent',
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     fontSize: 14,
     cursor: 'pointer',
   },
@@ -500,9 +514,9 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 24,
     padding: '14px 18px',
-    background: '#1e293b',
+    background: 'var(--bg-elevated)',
     borderRadius: 8,
-    border: '1px solid #334155',
+    border: '1px solid var(--border-strong)',
     justifyContent: 'space-around',
   },
   section: {
@@ -511,26 +525,26 @@ const s: Record<string, React.CSSProperties> = {
     gap: 8,
   },
   label: {
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     fontSize: 12,
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
   puzzleCard: {
-    background: '#1e293b',
-    border: '1px solid #334155',
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-strong)',
     borderRadius: 10,
     padding: '18px 20px',
   },
   puzzleTitle: {
-    color: '#f8fafc',
+    color: 'var(--text-1)',
     fontWeight: 700,
     fontSize: 20,
     marginBottom: 10,
   },
   desc: {
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     fontSize: 14,
     lineHeight: 1.6,
     margin: 0,

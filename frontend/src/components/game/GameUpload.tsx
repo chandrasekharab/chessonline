@@ -89,7 +89,7 @@ export default function GameUpload({ onSuccess }: Props) {
             <label htmlFor="pgn-file" style={styles.fileLabel}>
               <Upload size={24} />
               <span>Click to select a .pgn file</span>
-              <span style={{ fontSize: 12, color: '#64748b' }}>Max 5 MB</span>
+              <span style={{ fontSize: 12, color: 'var(--text-4)' }}>Max 5 MB</span>
             </label>
           </div>
           <button type="submit" disabled={loading} style={styles.btn}>
@@ -103,8 +103,8 @@ export default function GameUpload({ onSuccess }: Props) {
 
 const styles: Record<string, React.CSSProperties> = {
   card: {
-    background: '#1e293b',
-    border: '1px solid #334155',
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-strong)',
     borderRadius: 10,
     padding: 24,
     marginBottom: 28,
@@ -115,8 +115,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 6,
     background: 'transparent',
-    border: '1px solid #334155',
-    color: '#64748b',
+    border: '1px solid var(--border-strong)',
+    color: 'var(--text-4)',
     padding: '7px 16px',
     borderRadius: 6,
     cursor: 'pointer',
@@ -130,11 +130,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   textarea: {
-    background: '#0f172a',
-    border: '1px solid #334155',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border-strong)',
     borderRadius: 8,
     padding: '12px 14px',
-    color: '#f1f5f9',
+    color: 'var(--text-1)',
     fontFamily: 'monospace',
     fontSize: 13,
     resize: 'vertical',
@@ -143,7 +143,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   fileInput: { display: 'none' },
   fileArea: {
-    border: '2px dashed #334155',
+    border: '2px dashed var(--border-strong)',
     borderRadius: 8,
     padding: 32,
     textAlign: 'center',
@@ -155,7 +155,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 8,
     cursor: 'pointer',
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     fontSize: 14,
   },
   btn: {

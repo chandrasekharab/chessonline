@@ -81,10 +81,10 @@ export default function MatchmakingLobby() {
 
   return (
     <div style={{ maxWidth: '600px', margin: '40px auto', padding: '24px' }}>
-      <h1 style={{ color: '#e2e8f0', fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>
+      <h1 style={{ color: 'var(--text-2)', fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>
         Play Live Chess
       </h1>
-      <p style={{ color: '#64748b', marginBottom: '32px' }}>
+      <p style={{ color: 'var(--text-4)', marginBottom: '32px' }}>
         Challenge a random opponent or invite a friend.{' '}
         <span style={{ color: socketReady ? '#22c55e' : '#ef4444', fontSize: '12px' }}>
           ● {socketReady ? 'Connected' : 'Disconnected'}
@@ -93,7 +93,7 @@ export default function MatchmakingLobby() {
 
       {/* Time control selector */}
       <div style={{ marginBottom: '24px' }}>
-        <label style={{ color: '#94a3b8', display: 'block', marginBottom: '8px', fontSize: '14px' }}>
+        <label style={{ color: 'var(--text-3)', display: 'block', marginBottom: '8px', fontSize: '14px' }}>
           Time Control
         </label>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -105,9 +105,9 @@ export default function MatchmakingLobby() {
                 flex: 1,
                 padding: '10px',
                 borderRadius: '8px',
-                border: `2px solid ${selectedTc === tc ? '#3b82f6' : '#334155'}`,
-                background: selectedTc === tc ? '#1e3a5f' : '#1e293b',
-                color: selectedTc === tc ? '#60a5fa' : '#94a3b8',
+                border: `2px solid ${selectedTc === tc ? '#3b82f6' : 'var(--border-strong)'}`,
+                background: selectedTc === tc ? '#1e3a5f' : 'var(--bg-elevated)',
+                color: selectedTc === tc ? '#60a5fa' : 'var(--text-3)',
                 cursor: 'pointer',
                 fontWeight: selectedTc === tc ? 700 : 400,
                 fontSize: '13px',
@@ -120,21 +120,21 @@ export default function MatchmakingLobby() {
       </div>
 
       {/* Quick match */}
-      <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', marginBottom: '16px', border: '1px solid #334155' }}>
-        <h2 style={{ color: '#e2e8f0', fontSize: '18px', fontWeight: 600, margin: '0 0 12px' }}>
+      <div style={{ background: 'var(--bg-elevated)', borderRadius: '12px', padding: '20px', marginBottom: '16px', border: '1px solid var(--border-strong)' }}>
+        <h2 style={{ color: 'var(--text-2)', fontSize: '18px', fontWeight: 600, margin: '0 0 12px' }}>
           Quick Match
         </h2>
         {isQueued ? (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
               <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#22c55e', animation: 'pulse 1.5s infinite' }} />
-              <span style={{ color: '#94a3b8' }}>
+              <span style={{ color: 'var(--text-3)' }}>
                 Searching for {TIME_CONTROL_LABELS[queueTimeControl!]} opponent…
               </span>
             </div>
             <button
               onClick={leaveQueue}
-              style={{ padding: '8px 20px', borderRadius: '6px', background: '#334155', color: '#e2e8f0', border: 'none', cursor: 'pointer' }}
+              style={{ padding: '8px 20px', borderRadius: '6px', background: 'var(--border-strong)', color: 'var(--text-2)', border: 'none', cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -159,27 +159,27 @@ export default function MatchmakingLobby() {
       </div>
 
       {/* Private game */}
-      <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', border: '1px solid #334155' }}>
-        <h2 style={{ color: '#e2e8f0', fontSize: '18px', fontWeight: 600, margin: '0 0 12px' }}>
+      <div style={{ background: 'var(--bg-elevated)', borderRadius: '12px', padding: '20px', border: '1px solid var(--border-strong)' }}>
+        <h2 style={{ color: 'var(--text-2)', fontSize: '18px', fontWeight: 600, margin: '0 0 12px' }}>
           Private Game
         </h2>
 
         {/* Create */}
         {waitingForOpponent && inviteCode ? (
-          <div style={{ marginBottom: '16px', padding: '12px', background: '#0f172a', borderRadius: '8px' }}>
-            <p style={{ color: '#94a3b8', marginBottom: '8px', fontSize: '14px' }}>Share this invite code:</p>
+          <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-app)', borderRadius: '8px' }}>
+            <p style={{ color: 'var(--text-3)', marginBottom: '8px', fontSize: '14px' }}>Share this invite code:</p>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '4px', color: '#60a5fa', fontFamily: 'monospace' }}>
                 {inviteCode}
               </span>
               <button
                 onClick={() => { navigator.clipboard.writeText(inviteCode); toast.success('Copied!'); }}
-                style={{ padding: '6px 12px', borderRadius: '6px', background: '#334155', color: '#e2e8f0', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+                style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--border-strong)', color: 'var(--text-2)', border: 'none', cursor: 'pointer', fontSize: '13px' }}
               >
                 Copy
               </button>
             </div>
-            <p style={{ color: '#475569', fontSize: '13px', marginTop: '8px' }}>Waiting for opponent…</p>
+            <p style={{ color: 'var(--text-5)', fontSize: '13px', marginTop: '8px' }}>Waiting for opponent…</p>
             <button onClick={reset} style={{ marginTop: '8px', padding: '6px 12px', borderRadius: '6px', background: '#7f1d1d', color: '#fca5a5', border: 'none', cursor: 'pointer', fontSize: '13px' }}>
               Cancel
             </button>
@@ -213,9 +213,9 @@ export default function MatchmakingLobby() {
               flex: 1,
               padding: '8px 12px',
               borderRadius: '6px',
-              background: '#0f172a',
-              border: '1px solid #334155',
-              color: '#e2e8f0',
+              background: 'var(--bg-input)',
+              border: '1px solid var(--border-strong)',
+              color: 'var(--text-2)',
               fontFamily: 'monospace',
               fontSize: '16px',
               letterSpacing: '2px',

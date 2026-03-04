@@ -364,7 +364,7 @@ export default function LiveBoard() {
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={offerDraw}
-              style={{ flex: 1, padding: '8px', borderRadius: '6px', background: '#334155', color: '#e2e8f0', border: 'none', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '8px', borderRadius: '6px', background: 'var(--border-strong)', color: 'var(--text-2)', border: 'none', cursor: 'pointer' }}
             >
               ½ Draw
             </button>
@@ -379,7 +379,7 @@ export default function LiveBoard() {
 
         {/* Draw offer banner */}
         {drawOfferedBy && drawOfferedBy !== myColor && (
-          <div style={{ background: '#1e293b', border: '1px solid #fbbf24', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid #fbbf24', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
             <p style={{ color: '#fbbf24', marginBottom: '8px' }}>Your opponent offers a draw</p>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
               <button onClick={acceptDraw} style={{ padding: '6px 16px', borderRadius: '6px', background: '#22c55e', color: '#fff', border: 'none', cursor: 'pointer' }}>Accept</button>
@@ -390,24 +390,24 @@ export default function LiveBoard() {
       </div>
 
       {/* Move list */}
-      <div style={{ minWidth: '180px', maxHeight: '520px', overflow: 'auto', background: '#1e293b', borderRadius: '8px', padding: '12px' }}>
-        <h3 style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Moves</h3>
+      <div style={{ minWidth: '180px', maxHeight: '520px', overflow: 'auto', background: 'var(--bg-elevated)', borderRadius: '8px', padding: '12px' }}>
+        <h3 style={{ color: 'var(--text-3)', fontSize: '14px', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Moves</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr', gap: '2px 8px' }}>
           {moves.reduce<ReactElement[]>((acc: ReactElement[], m: { san: string; uci: string }, i: number) => {
             if (i % 2 === 0) {
               acc.push(
-                <span key={`n${i}`} style={{ color: '#475569', fontSize: '13px', lineHeight: '24px' }}>
+                <span key={`n${i}`} style={{ color: 'var(--text-5)', fontSize: '13px', lineHeight: '24px' }}>
                   {Math.floor(i / 2) + 1}.
                 </span>
               );
               acc.push(
-                <span key={`w${i}`} style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: '24px' }}>
+                <span key={`w${i}`} style={{ color: 'var(--text-2)', fontSize: '13px', lineHeight: '24px' }}>
                   {m.san}
                 </span>
               );
               if (i + 1 < moves.length) {
                 acc.push(
-                  <span key={`b${i}`} style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: '24px' }}>
+                  <span key={`b${i}`} style={{ color: 'var(--text-2)', fontSize: '13px', lineHeight: '24px' }}>
                     {moves[i + 1].san}
                   </span>
                 );
@@ -419,7 +419,7 @@ export default function LiveBoard() {
           }, [])}
         </div>
         {moves.length === 0 && (
-          <p style={{ color: '#475569', fontSize: '13px' }}>No moves yet</p>
+          <p style={{ color: 'var(--text-5)', fontSize: '13px' }}>No moves yet</p>
         )}
       </div>
 

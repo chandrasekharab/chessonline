@@ -215,3 +215,128 @@ The engine service maintains a **pool of N Stockfish processes** (`ENGINE_MAX_CO
 | Frontend state | Zustand + React Query | Minimal boilerplate; server-state caching |
 | Build | Vite + tsc | Fast HMR in dev; strict type checking |
 | Container | Docker multi-stage | Minimal runtime image; BuildKit npm cache |
+
+---
+
+## AI Explanation Engine
+
+### Service Layers
+
+```
+POST /games/:id/analyze
+        │
+        └─ analysis.service.ts (Stockfish evaluation pipeline)
+                │
+                └─ [on complete] setImmediate → background AI batch
+                        │
+                        ├─ 1. Feature Extraction (chess.js — no FEN to LLM)
+                        │     featureExtraction.service.ts
+                        │     • material balance
+                        │     • king safety heuristic
+                        │     • center control
+                        │     • hanging pieces
+                        │     • tactical threat detection
+                        │
+                        ├─ 2. Cache Lookup
+                        │     DB: ai_explanations (position_hash + rating_tier)
+                        │     → cache hit: return immediately
+                        │
+                        ├─ 3. LLM Call (on cache miss)
+                        │     explanation.service.ts
+                        │     → OpenAI-compatible / Anthropic / Ollama
+                        │     → Personalised prompt per rating tier
+                        │        beginner (<1000): simple, no variations
+                        │        intermediate (1000-1600): short variation
+                        │        advanced (>1600): full principal variation
+                        │
+                        ├─ 4. Persist
+                        │     • ai_explanations (cached by position hash)
+                        │     • llm_token_log (cost tracking)
+                        │     • user_mistake_patterns (theme aggregation)
+                        │
+                        └─ 5. Game Summary
+                              gameSummary.service.ts
+                              • cluster mistakes by theme
+                              • top 3 weaknesses
+                              • tactical vs positional ratio
+                              • training suggestion
+```
+
+### New Database Tables
+
+| Table | Purpose |
+|---|---|
+| `position_features` | Extracted chess signals (keyed by SHA-256 position hash) |
+| `ai_explanations` | Cached LLM explanations (unique per hash + rating_tier) |
+| `ai_game_summaries` | Per-game AI coaching summary |
+| `user_mistake_patterns` | Aggregated mistake theme counts per user |
+| `llm_token_log` | Token usage for cost monitoring |
+
+### API Contracts
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/explanations/games/:gameId/moves/:moveNumber` | On-demand move explanation (triggers LLM if not cached) |
+| `GET` | `/explanations/games/:gameId/summary` | Get or generate post-game AI summary |
+| `GET` | `/explanations/games/:gameId/all` | All cached explanations for a game |
+| `GET` | `/explanations/me/patterns` | User's accumulated mistake patterns |
+| `GET` | `/explanations/me/token-usage` | LLM token usage statistics |
+
+### Provider Configuration
+
+| Env Var | Default | Description |
+|---|---|---|
+| `AI_EXPLANATIONS_ENABLED` | `false` | Master toggle |
+| `LLM_PROVIDER` | `openai` | `openai` \| `anthropic` \| `ollama` \| `custom` |
+| `LLM_MODEL` | `gpt-4o-mini` | Any model — swap for fine-tuned models |
+| `LLM_BASE_URL` | _(empty)_ | Custom OpenAI-compatible endpoint |
+| `OPENAI_API_KEY` | _(empty)_ | Required for OpenAI provider |
+| `ANTHROPIC_API_KEY` | _(empty)_ | Required for Anthropic provider |
+| `EXPLANATION_MIN_DROP_CP` | `100` | Min eval drop to generate explanation |
+| `LLM_MAX_TOKENS` | `300` | Max tokens per explanation |
+
+### Explanation Example Outputs
+
+**Beginner** (< 1000 rating):
+```
+1. This move dropped the queen on d5 where it can be captured for free.
+2. Your opponent can simply take the queen with their knight, winning a huge amount of material.
+3. Instead, moving the queen back to e6 would have kept it safe and maintained your position.
+```
+
+**Intermediate** (1000–1600 rating):
+```
+1. Moving Qd5 was a mistake because the queen landed on an undefended square attacked by Nc3.
+2. After Nc3xd5, you lose the queen for a knight — a 6-point material deficit. The game becomes very difficult.
+3. Qe6 was the correct square, keeping the queen active while maintaining pressure on e4.
+   The key variation: 1...Qe6 2.Nf3 d5 gives you an equal game.
+```
+
+**Advanced** (> 1600 rating):
+```
+1. Qd5 blunders into the fork 1.Nc3xd5 because the queen had no escape squares after Rd1 pins the diagonal.
+2. After Nc3xd5 Rxd5 2.Re1, White wins the exchange with continued pressure — evaluation swings to +2.3.
+3. The engine recommends 1...Qe6 2.Rf1 d5 3.exd5 Nxd5 4.Nxd5 Qxd5 5.Qh5+ (=0.0).
+   Principal variation confirms the swap maintains dynamic equality despite the pawn structure asymmetry.
+```
+
+### Performance & Cost Optimisation
+
+- **No LLM calls for inaccuracies** (controlled by `EXPLANATION_MIN_DROP_CP`)
+- **Cache layer**: DB-level deduplication on `(position_hash, rating_tier)` — repeated positions across different games cost 0 tokens
+- **Batch processing**: explanations generated asynchronously via `setImmediate` after analysis completes
+- **Token logging**: every LLM call is recorded in `llm_token_log` for cost analysis
+- **Provider-agnostic**: swap LLM with a single env var change — zero code changes needed for fine-tuned models
+
+### Recommended Cloud Deployment
+
+| Component | Recommended Service | Notes |
+|---|---|---|
+| API + Worker | AWS ECS Fargate / GCP Cloud Run | Scale worker replicas independently |
+| PostgreSQL | AWS RDS / Supabase | Enable pgvector for future semantic search |
+| Redis | AWS ElastiCache / Upstash | Redis 7 cluster mode for high availability |
+| LLM | OpenAI gpt-4o-mini | ~$0.15/1M input tokens — lowest cost for chess explanations |
+| Static frontend | CloudFront + S3 / Vercel | CDN edge caching |
+| Secrets | AWS SSM / GCP Secret Manager | Never bake API keys into container images |
+
+

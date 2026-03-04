@@ -25,16 +25,16 @@ export default function PlayerClock({ timeMs, isActive, label, rating }: PlayerC
         justifyContent: 'space-between',
         padding: '8px 16px',
         borderRadius: '8px',
-        background: isActive ? '#1e3a5f' : '#1a1a2e',
-        border: `2px solid ${isActive ? '#3b82f6' : '#334155'}`,
+        background: isActive ? '#1e3a5f' : 'var(--bg-surface)',
+        border: `2px solid ${isActive ? '#3b82f6' : 'var(--border-strong)'}`,
         transition: 'all 0.3s ease',
         minWidth: '200px',
       }}
     >
       <div>
-        <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '2px' }}>{label}</div>
+        <div style={{ color: 'var(--text-3)', fontSize: '12px', marginBottom: '2px' }}>{label}</div>
         {rating !== undefined && (
-          <div style={{ color: '#64748b', fontSize: '11px' }}>
+          <div style={{ color: 'var(--text-4)', fontSize: '11px' }}>
             {rating} ELO
           </div>
         )}
@@ -45,7 +45,7 @@ export default function PlayerClock({ timeMs, isActive, label, rating }: PlayerC
           fontWeight: 700,
           fontVariantNumeric: 'tabular-nums',
           fontFamily: 'monospace',
-          color: isEmpty ? '#ef4444' : isLow ? '#f97316' : isActive ? '#60a5fa' : '#e2e8f0',
+          color: isEmpty ? '#ef4444' : isLow ? '#f97316' : isActive ? '#60a5fa' : 'var(--text-2)',
           animation: isLow && isActive ? 'pulse 1s infinite' : undefined,
         }}
       >

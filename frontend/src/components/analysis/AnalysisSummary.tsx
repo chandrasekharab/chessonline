@@ -1,68 +1,63 @@
 import type { MoveLabel } from '../../types';
-import { LABEL_COLORS, LABEL_DISPLAY } from '../../types';
+import { LABEL_COLORS } from '../../types';
 
 interface Props {
   summary: Record<string, number>;
 }
 
-const SUMMARY_LABELS: MoveLabel[] = ['blunder', 'mistake', 'inaccuracy', 'missed_win', 'excellent', 'best', 'good'];
+const STATS: { label: MoveLabel; display: string; icon: string }[] = [
+  { label: 'blunder',    display: 'Blunders',    icon: '❌' },
+  { label: 'mistake',    display: 'Mistakes',    icon: '⚠️' },
+  { label: 'inaccuracy', display: 'Inaccuracies', icon: '🟡' },
+  { label: 'missed_win', display: 'Missed Wins',  icon: '💜' },
+  { label: 'excellent',  display: 'Excellent',    icon: '🟢' },
+  { label: 'best',       display: 'Best',         icon: '🔵' },
+];
 
 export default function AnalysisSummary({ summary }: Props) {
   const total = Object.values(summary).reduce((a, b) => a + b, 0);
 
   return (
-    <div style={styles.container}>
-      {SUMMARY_LABELS.map((label) => {
+    <div style={S.strip}>
+      {STATS.map(({ label, display, icon }) => {
         const count = summary[label] ?? 0;
-        if (count === 0 && label === 'good') return null;
+        const color = LABEL_COLORS[label];
         return (
-          <div key={label} style={styles.item}>
-            <div style={{ ...styles.dot, background: LABEL_COLORS[label] }} />
-            <div style={styles.labelText}>{LABEL_DISPLAY[label]}</div>
-            <div style={styles.count}>{count}</div>
+          <div key={label} style={S.stat}>
+            <div style={{ ...S.colorBar, background: color }} />
+            <div style={S.statBody}>
+              <span style={{ ...S.statCount, color: count > 0 ? color : 'var(--border-mid)' }}>{count}</span>
+              <span style={S.statLabel}>{icon} {display}</span>
+            </div>
           </div>
         );
       })}
-      <div style={styles.item}>
-        <div style={{ ...styles.dot, background: '#475569' }} />
-        <div style={styles.labelText}>Total</div>
-        <div style={styles.count}>{total}</div>
+      <div style={{ ...S.stat, ...S.totalStat }}>
+        <div style={{ ...S.colorBar, background: 'var(--border-strong)' }} />
+        <div style={S.statBody}>
+          <span style={{ ...S.statCount, color: 'var(--text-4)' }}>{total}</span>
+          <span style={S.statLabel}>Total</span>
+        </div>
       </div>
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    gap: 10,
-    flexWrap: 'wrap',
-    marginBottom: 20,
+const S: Record<string, React.CSSProperties> = {
+  strip: {
+    display: 'flex', flexWrap: 'wrap', gap: 6,
   },
-  item: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    background: '#1e293b',
-    border: '1px solid #334155',
-    borderRadius: 6,
-    padding: '6px 12px',
+  stat: {
+    display: 'flex', alignItems: 'stretch',
+    background: 'var(--bg-surface)', border: '1px solid var(--border)',
+    borderRadius: 7, overflow: 'hidden', minWidth: 72,
   },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: '50%',
-    flexShrink: 0,
+  totalStat: {},
+  colorBar: { width: 3, flexShrink: 0 },
+  statBody: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    padding: '6px 10px', gap: 1,
   },
-  labelText: {
-    fontSize: 13,
-    color: '#94a3b8',
-  },
-  count: {
-    fontSize: 15,
-    fontWeight: 700,
-    color: '#f1f5f9',
-    minWidth: 20,
-    textAlign: 'right',
-  },
+  statCount: { fontSize: 20, fontWeight: 700, lineHeight: 1 },
+  statLabel: { fontSize: 10, color: 'var(--text-5)', fontWeight: 500, whiteSpace: 'nowrap' as const },
 };

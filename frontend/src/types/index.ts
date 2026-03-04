@@ -162,3 +162,73 @@ export const TIME_CONTROL_LABELS: Record<TimeControl, string> = {
   blitz: 'Blitz (5 min)',
   rapid: 'Rapid (10 min)',
 };
+
+// ─── AI Explanation Engine Types ─────────────────────────────────────────────
+
+export type RatingTier = 'beginner' | 'intermediate' | 'advanced';
+
+export interface PositionFeatures {
+  move: string;
+  fen: string;
+  evaluation_before: number;
+  evaluation_after: number;
+  evaluation_drop: number;
+  material_balance: number;
+  king_safety_status: 'safe' | 'slightly_exposed' | 'exposed' | 'critical';
+  center_control_status: 'white_dominant' | 'black_dominant' | 'neutral' | 'contested';
+  hanging_pieces: boolean;
+  tactical_threat_allowed: string | null;
+  better_alternative: string;
+  principal_variation: string[];
+}
+
+export interface ExplainMoveResponse {
+  explanation: string;
+  features: PositionFeatures;
+  cached: boolean;
+  rating_tier: RatingTier;
+  model_used: string;
+}
+
+export interface GameSummaryResponse {
+  summary_text: string;
+  top_weaknesses: string[];
+  training_focus: string;
+  tactical_error_count: number;
+  positional_error_count: number;
+  cached: boolean;
+  model_used: string;
+}
+
+export interface MistakePattern {
+  user_id: string;
+  theme: string;
+  occurrences: number;
+  last_seen_at: string;
+}
+
+// ─── AI Coach Chat ──────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  id: string;          // local uuid
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: number;   // Date.now()
+  pending?: boolean;   // optimistic while waiting
+}
+
+export interface CoachChatContext {
+  players?: string;
+  event?: string;
+  currentMove?: string;
+  moveNumber?: number;
+  label?: string;
+  eval_before?: number;
+  eval_after?: number;
+  best_move?: string;
+}
+
+export interface CoachChatResponse {
+  reply: string;
+  model_used: string;
+}

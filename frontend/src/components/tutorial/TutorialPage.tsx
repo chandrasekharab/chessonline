@@ -391,7 +391,7 @@ export default function TutorialPage() {
 
           <div style={s.setupSection}>
             <label style={s.label}>
-              Difficulty — <strong style={{ color: '#f8fafc' }}>{DIFFICULTY_LABELS[difficulty]}</strong>
+              Difficulty — <strong style={{ color: 'var(--text-1)' }}>{DIFFICULTY_LABELS[difficulty]}</strong>
             </label>
             <input
               type="range"
@@ -404,7 +404,7 @@ export default function TutorialPage() {
             />
             <div style={s.sliderLabels}>
               {[1, 2, 3, 4, 5].map((d) => (
-                <span key={d} style={{ color: d === difficulty ? '#60a5fa' : '#475569', fontSize: 12 }}>
+                <span key={d} style={{ color: d === difficulty ? '#60a5fa' : 'var(--text-5)', fontSize: 12 }}>
                   {DIFFICULTY_LABELS[d]}
                 </span>
               ))}
@@ -435,7 +435,7 @@ export default function TutorialPage() {
       {/* Header bar */}
       <div style={s.header}>
         <div style={s.headerLeft}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#f8fafc' }}>♟ Tutorial</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)' }}>♟ Tutorial</span>
           <span style={s.badge}>{DIFFICULTY_LABELS[difficulty]}</span>
           <span style={s.badge}>{playerColor === 'white' ? '♔ White' : '♚ Black'}</span>
         </div>
@@ -479,7 +479,7 @@ export default function TutorialPage() {
             ) : myTurn ? (
               <span style={{ color: '#4ade80' }}>Your turn</span>
             ) : (
-              <span style={{ color: '#94a3b8' }}>Waiting…</span>
+              <span style={{ color: 'var(--text-3)' }}>Waiting…</span>
             )}
           </div>
 
@@ -537,7 +537,7 @@ export default function TutorialPage() {
           <h3 style={s.panelTitle}>Move Explanations</h3>
           <div style={s.cardList}>
             {cards.length === 0 && (
-              <p style={{ color: '#475569', fontSize: 13, padding: '8px 0' }}>
+              <p style={{ color: 'var(--text-5)', fontSize: 13, padding: '8px 0' }}>
                 Make your first move to receive feedback.
               </p>
             )}
@@ -549,7 +549,7 @@ export default function TutorialPage() {
                 <div style={s.cardHeader}>
                   <span style={{
                     ...s.cardSan,
-                    color: LABEL_COLORS[card.detail.label as keyof typeof LABEL_COLORS] ?? '#e2e8f0',
+                    color: LABEL_COLORS[card.detail.label as keyof typeof LABEL_COLORS] ?? 'var(--text-2)',
                   }}>
                     {LABEL_ICONS[card.detail.label] ?? ''} {card.detail.san}
                   </span>
@@ -586,21 +586,21 @@ const s: Record<string, CSSProperties> = {
   setupCard: {
     maxWidth: 520,
     margin: '60px auto 0',
-    background: '#1e293b',
+    background: 'var(--bg-elevated)',
     borderRadius: 16,
     padding: '40px 48px',
-    border: '1px solid #334155',
+    border: '1px solid var(--border-strong)',
     boxShadow: '0 8px 48px rgba(0,0,0,0.4)',
   },
   setupTitle: {
     fontSize: 28,
     fontWeight: 700,
-    color: '#f8fafc',
+    color: 'var(--text-1)',
     margin: '0 0 8px',
   },
   setupSubtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     margin: '0 0 32px',
     lineHeight: 1.6,
   },
@@ -609,7 +609,7 @@ const s: Record<string, CSSProperties> = {
   },
   label: {
     display: 'block',
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     fontSize: 13,
     fontWeight: 600,
     textTransform: 'uppercase',
@@ -624,9 +624,9 @@ const s: Record<string, CSSProperties> = {
     flex: 1,
     padding: '10px 0',
     borderRadius: 8,
-    border: '2px solid #334155',
-    background: '#0f172a',
-    color: '#94a3b8',
+    border: '2px solid var(--border-strong)',
+    background: 'var(--bg-app)',
+    color: 'var(--text-3)',
     fontSize: 15,
     fontWeight: 600,
     cursor: 'pointer',
@@ -671,11 +671,11 @@ const s: Record<string, CSSProperties> = {
     gap: 10,
   },
   badge: {
-    background: '#1e293b',
-    border: '1px solid #334155',
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-strong)',
     borderRadius: 6,
     padding: '3px 10px',
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     fontSize: 12,
     fontWeight: 600,
   },
@@ -702,9 +702,9 @@ const s: Record<string, CSSProperties> = {
   newGameBtn: {
     padding: '8px 16px',
     borderRadius: 8,
-    border: '1px solid #334155',
-    background: '#1e293b',
-    color: '#94a3b8',
+    border: '1px solid var(--border-strong)',
+    background: 'var(--bg-elevated)',
+    color: 'var(--text-3)',
     fontSize: 14,
     cursor: 'pointer',
   },
@@ -724,9 +724,9 @@ const s: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: 8,
     padding: '8px 12px',
-    background: '#1e293b',
+    background: 'var(--bg-elevated)',
     borderRadius: 8,
-    border: '1px solid #334155',
+    border: '1px solid var(--border-strong)',
     fontSize: 14,
     minHeight: 36,
   },
@@ -734,7 +734,7 @@ const s: Record<string, CSSProperties> = {
     display: 'inline-block',
     width: 12,
     height: 12,
-    border: '2px solid #334155',
+    border: '2px solid var(--border-strong)',
     borderTop: '2px solid #60a5fa',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
@@ -757,8 +757,8 @@ const s: Record<string, CSSProperties> = {
     flex: 1,
     minWidth: 300,
     maxWidth: 440,
-    background: '#1e293b',
-    border: '1px solid #334155',
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-strong)',
     borderRadius: 12,
     padding: '16px',
     display: 'flex',
@@ -766,7 +766,7 @@ const s: Record<string, CSSProperties> = {
     maxHeight: '80vh',
   },
   panelTitle: {
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     fontSize: 13,
     fontWeight: 700,
     textTransform: 'uppercase',
@@ -781,7 +781,7 @@ const s: Record<string, CSSProperties> = {
     gap: 10,
   },
   moveCard: {
-    background: '#0f172a',
+    background: 'var(--bg-app)',
     borderRadius: 8,
     padding: '10px 12px',
     borderLeft: '3px solid #475569',
@@ -804,13 +804,13 @@ const s: Record<string, CSSProperties> = {
     letterSpacing: '0.05em',
   },
   cardExplanation: {
-    color: '#cbd5e1',
+    color: 'var(--text-2)',
     fontSize: 13,
     lineHeight: 1.6,
     margin: 0,
   },
   cardEval: {
-    color: '#64748b',
+    color: 'var(--text-4)',
     fontSize: 11,
     marginTop: 6,
     fontFamily: 'monospace',

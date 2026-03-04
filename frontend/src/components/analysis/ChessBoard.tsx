@@ -6,11 +6,16 @@ interface Props {
   fen: string;
   orientation?: 'white' | 'black';
   lastMove?: { from: string; to: string };
+  /** Controlled board width — lift state to parent so EvaluationBar stays in sync */
+  boardWidth?: number;
+  onBoardWidthChange?: (w: number) => void;
 }
 
-export default function ChessBoardView({ fen, orientation = 'white', lastMove }: Props) {
+export default function ChessBoardView({ fen, orientation = 'white', lastMove, boardWidth: controlledWidth, onBoardWidthChange }: Props) {
   const theme = useBoardThemeStore((s) => s.getTheme());
-  const [boardWidth, setBoardWidth] = useState(400);
+  const [internalWidth, setInternalWidth] = useState(420);
+  const boardWidth = controlledWidth ?? internalWidth;
+  const setBoardWidth = (w: number) => { setInternalWidth(w); onBoardWidthChange?.(w); };
   const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const onResizeStart = useCallback(

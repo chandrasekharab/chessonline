@@ -251,3 +251,106 @@ export interface LiveGameView {
   invite_code: string | null;
   analysis_game_id: string | null;
 }
+
+// ─── AI Explanation Engine Types ──────────────────────────────────────────────
+
+/** Rating tier buckets drive explanation verbosity. */
+export type RatingTier = 'beginner' | 'intermediate' | 'advanced';
+
+export function getRatingTier(rating: number): RatingTier {
+  if (rating < 1000) return 'beginner';
+  if (rating <= 1600) return 'intermediate';
+  return 'advanced';
+}
+
+/** Structured position signals extracted from Stockfish output + chess.js. */
+export interface PositionFeatures {
+  move: string;
+  fen: string;
+  evaluation_before: number;
+  evaluation_after: number;
+  evaluation_drop: number;
+  material_balance: number;
+  king_safety_status: 'safe' | 'slightly_exposed' | 'exposed' | 'critical';
+  center_control_status: 'white_dominant' | 'black_dominant' | 'neutral' | 'contested';
+  hanging_pieces: boolean;
+  tactical_threat_allowed: string | null;
+  better_alternative: string;
+  principal_variation: string[];
+}
+
+/** DB row for position_features */
+export interface PositionFeaturesRow extends PositionFeatures {
+  id: string;
+  position_hash: string;
+  game_id: string;
+  move_number: number;
+  label: MoveLabel;
+  created_at: Date;
+}
+
+/** DB row for ai_explanations */
+export interface AiExplanationRow {
+  id: string;
+  game_id: string;
+  analysis_id: string | null;
+  position_hash: string;
+  rating_tier: RatingTier;
+  explanation: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  model_used: string;
+  created_at: Date;
+}
+
+/** DB row for ai_game_summaries */
+export interface AiGameSummaryRow {
+  id: string;
+  game_id: string;
+  top_weaknesses: string[];
+  training_focus: string;
+  tactical_error_count: number;
+  positional_error_count: number;
+  summary_text: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  model_used: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** API response shape for single-move explanation */
+export interface ExplainMoveResponse {
+  explanation: string;
+  features: PositionFeatures;
+  cached: boolean;
+  rating_tier: RatingTier;
+  model_used: string;
+}
+
+/** API response shape for game AI summary */
+export interface GameSummaryResponse {
+  summary_text: string;
+  top_weaknesses: string[];
+  training_focus: string;
+  tactical_error_count: number;
+  positional_error_count: number;
+  cached: boolean;
+  model_used: string;
+}
+
+/** Mistake theme categories for pattern tracking */
+export type MistakeTheme =
+  | 'king_safety'
+  | 'hanging_pieces'
+  | 'endgame'
+  | 'opening'
+  | 'tactics'
+  | 'positional';
+
+export interface UserMistakePattern {
+  user_id: string;
+  theme: MistakeTheme;
+  occurrences: number;
+  last_seen_at: Date;
+}

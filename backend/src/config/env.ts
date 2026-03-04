@@ -25,5 +25,17 @@ export const env = {
   RATE_LIMIT_WINDOW_MS: parseInt(optional('RATE_LIMIT_WINDOW_MS', '900000'), 10),
   RATE_LIMIT_MAX_REQUESTS: parseInt(optional('RATE_LIMIT_MAX_REQUESTS', '100'), 10),
   ANALYSIS_RATE_LIMIT_MAX: parseInt(optional('ANALYSIS_RATE_LIMIT_MAX', '10'), 10),
+  // ─── AI Explanation Engine ───────────────────────────────────────────────
   OPENAI_API_KEY: optional('OPENAI_API_KEY', ''),
+  ANTHROPIC_API_KEY: optional('ANTHROPIC_API_KEY', ''),
+  LLM_PROVIDER: optional('LLM_PROVIDER', 'openai'),        // openai | anthropic | ollama | custom
+  LLM_MODEL: optional('LLM_MODEL', 'gpt-4o-mini'),          // model name; swap freely
+  LLM_BASE_URL: optional('LLM_BASE_URL', ''),               // custom OpenAI-compatible base URL
+  LLM_MAX_TOKENS: parseInt(optional('LLM_MAX_TOKENS', '300'), 10),
+  LLM_TEMPERATURE: parseFloat(optional('LLM_TEMPERATURE', '0.4')),
+  // Only generate explanations for moves at or worse than this threshold (cp drop)
+  EXPLANATION_MIN_DROP_CP: parseInt(optional('EXPLANATION_MIN_DROP_CP', '100'), 10),
+  // Redis TTL for explanation cache (seconds) – default 30 days
+  EXPLANATION_CACHE_TTL_S: parseInt(optional('EXPLANATION_CACHE_TTL_S', '2592000'), 10),
+  AI_EXPLANATIONS_ENABLED: optional('AI_EXPLANATIONS_ENABLED', 'true') === 'true',
 } as const;

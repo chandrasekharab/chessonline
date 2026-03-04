@@ -42,8 +42,8 @@ export default function GameOverModal({ info, myColor, onClose }: GameOverModalP
     >
       <div
         style={{
-          background: '#1e293b',
-          border: '1px solid #334155',
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-strong)',
           borderRadius: '16px',
           padding: '40px',
           textAlign: 'center',
@@ -57,14 +57,14 @@ export default function GameOverModal({ info, myColor, onClose }: GameOverModalP
         <h2 style={{ fontSize: '32px', fontWeight: 800, color: resultColor, margin: '0 0 8px' }}>
           {resultText}
         </h2>
-        <p style={{ color: '#94a3b8', marginBottom: '16px', textTransform: 'capitalize' }}>
+        <p style={{ color: 'var(--text-3)', marginBottom: '16px', textTransform: 'capitalize' }}>
           {terminationText}
         </p>
 
         {myRatingChange !== undefined && (
           <div
             style={{
-              background: '#0f172a',
+              background: 'var(--bg-app)',
               borderRadius: '8px',
               padding: '12px',
               marginBottom: '24px',
@@ -99,8 +99,8 @@ export default function GameOverModal({ info, myColor, onClose }: GameOverModalP
             style={{
               padding: '10px 20px',
               borderRadius: '8px',
-              background: '#334155',
-              color: '#e2e8f0',
+              background: 'var(--border-strong)',
+              color: 'var(--text-2)',
               border: 'none',
               cursor: 'pointer',
               fontWeight: 600,

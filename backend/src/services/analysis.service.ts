@@ -6,6 +6,7 @@ import { parsePgn } from '../utils/pgn.parser';
 import { classifyMove, clampEval } from '../utils/classification';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
+import { batchGenerateExplanations, getOrGenerateGameSummary } from './aiExplanation.orchestrator';
 
 const gameRepo = new GameRepository();
 const analysisRepo = new AnalysisRepository();
@@ -86,4 +87,17 @@ export async function analyseGame(
   await gameRepo.updateStatus(gameId, 'completed');
 
   logger.info('Analysis complete', { gameId, totalMoves: rows.length });
+
+  // ── AI Explanation batch (fire-and-forget, non-blocking) ────────────────
+  if (env.AI_EXPLANATIONS_ENABLED) {
+    const userId = game.user_id;
+    setImmediate(async () => {
+      try {
+        await batchGenerateExplanations(gameId, userId);
+        await getOrGenerateGameSummary({ gameId, userId });
+      } catch (err) {
+        logger.error('Background AI explanation failed', { gameId, error: String(err) });
+      }
+    });
+  }
 }

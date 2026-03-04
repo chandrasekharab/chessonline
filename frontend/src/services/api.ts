@@ -170,3 +170,50 @@ export function getErrorMessage(error: unknown): string {
   }
   return String(error);
 }
+
+// ─── AI Explanations ───────────────────────────────────────────────────
+import type { ExplainMoveResponse, GameSummaryResponse, MistakePattern } from '../types';
+
+export const explanationApi = {
+  /** Explain a single move (POST triggers LLM if not cached) */
+  explainMove: (gameId: string, moveNumber: number) =>
+    api.post<ExplainMoveResponse>(`/explanations/games/${gameId}/moves/${moveNumber}`),
+
+  /** Get or generate AI post-game summary */
+  getGameSummary: (gameId: string) =>
+    api.get<GameSummaryResponse>(`/explanations/games/${gameId}/summary`),
+
+  /** All cached explanations for a game (lightweight, no LLM call) */
+  getAllExplanations: (gameId: string) =>
+    api.get<{ explanations: (ExplainMoveResponse & { move_number: number; move: string })[] }>(
+      `/explanations/games/${gameId}/all`,
+    ),
+
+  /** User's accumulated mistake patterns */
+  getMistakePatterns: () =>
+    api.get<{ patterns: MistakePattern[] }>('/explanations/me/patterns'),
+
+  /** User's LLM token usage stats */
+  getTokenUsage: () =>
+    api.get<{ total_tokens: number; prompt_tokens: number; completion_tokens: number }>(
+      '/explanations/me/token-usage',
+    ),
+
+  /** Explain a completed puzzle solution */
+  explainPuzzle: (fen: string, solution: string[], tags: string[], rating?: number) =>
+    api.post<{ explanation: string; model_used: string }>('/explanations/puzzle/explain', {
+      fen, solution, tags, rating,
+    }),
+
+  /** Free-form AI coach chat for a game */
+  chat: (
+    gameId: string,
+    message: string,
+    history: { role: 'user' | 'assistant'; content: string }[],
+    context?: import('../types').CoachChatContext,
+  ) =>
+    api.post<{ reply: string; model_used: string }>(
+      `/explanations/games/${gameId}/chat`,
+      { message, history, context },
+    ),
+};

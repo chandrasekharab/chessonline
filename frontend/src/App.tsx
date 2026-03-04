@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
+import { useUIThemeStore } from './store/uiThemeStore';
 import Navbar from './components/common/Navbar';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -12,9 +14,23 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 
 export default function App() {
   const user = useAuthStore((s) => s.user);
+  const { theme, resolved } = useUIThemeStore();
+
+  // Apply theme to <html data-theme="...">
+  useEffect(() => {
+    const applyTheme = () => {
+      document.documentElement.setAttribute('data-theme', resolved());
+    };
+    applyTheme();
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: light)');
+      mq.addEventListener('change', applyTheme);
+      return () => mq.removeEventListener('change', applyTheme);
+    }
+  }, [theme, resolved]);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-app)', color: 'var(--text-2)' }}>
       {user && <Navbar />}
       <main style={{ flex: 1 }}>
         <Routes>

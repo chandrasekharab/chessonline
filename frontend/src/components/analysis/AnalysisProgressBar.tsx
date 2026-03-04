@@ -70,7 +70,7 @@ export default function AnalysisProgressBar({ current, total }: Props) {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    background: 'linear-gradient(135deg, #1e293b 0%, #0f1f35 100%)',
+    background: 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-app) 100%)',
     border: '1px solid #f59e0b44',
     borderRadius: 10,
     padding: '14px 18px',
@@ -104,7 +104,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
   },
   side: {
-    color: '#94a3b8',
+    color: 'var(--text-3)',
     fontWeight: 400,
   },
   pct: {
@@ -117,7 +117,7 @@ const styles: Record<string, React.CSSProperties> = {
   track: {
     width: '100%',
     height: 8,
-    background: '#1e3a5f',
+    background: 'var(--bg-elevated)',
     borderRadius: 999,
     overflow: 'hidden',
   },
@@ -133,7 +133,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 6,
   },
   subtext: {
-    color: '#475569',
+    color: 'var(--text-5)',
     fontSize: 12,
   },
 };
