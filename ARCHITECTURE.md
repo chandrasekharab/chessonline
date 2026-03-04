@@ -2,21 +2,30 @@
 
 ## Overview
 
-Chess Insight Engine is a full-stack, multi-user web platform that accepts chess games in PGN format and automatically classifies every move (blunder, mistake, inaccuracy, excellent, etc.) by running each position through the Stockfish engine at depth 18.
+Chess Insight Engine is a full-stack, multi-user chess platform offering:
+
+- **PGN game analysis** — every move classified (blunder, mistake, inaccuracy, etc.) by Stockfish at depth 18  
+- **Live multiplayer** — real-time games via Socket.IO with ELO matchmaking  
+- **Puzzle training** — spaced-repetition tactical puzzles with live engine hints  
+- **Tutorial engine** — interactive opening/endgame lessons powered by Stockfish  
+- **AI Coach** — LLM-generated per-move explanations, game summaries, and mistake-pattern tracking  
+- **Theme system** — dark / light / system colour scheme switcher with board-theme selection
 
 ```
 Browser (React/Vite)
-       │  HTTP / JSON
+       │  HTTP / JSON + WebSocket (Socket.IO)
        ▼
-  nginx:alpine  ──proxy /auth, /games──►  Express API  (Node 20)
-                                               │         │
-                                        PostgreSQL 16   Redis 7
-                                               │         │
+  nginx:alpine  ──proxy /auth /games /live/puzzles /tutorial /explanations──►  Express API  (Node 20)
+                                               │         │                           │
+                                        PostgreSQL 16   Redis 7               Socket.IO server
+                                               │         │                    (live multiplayer)
                                          BullMQ queue ◄─┘
                                                │
                                         Analysis Worker (Node 20)
                                                │
-                                         Stockfish UCI
+                                         Stockfish UCI pool
+                                               │
+                                         LLM Provider (OpenAI / Anthropic / Ollama)
 ```
 
 ---
@@ -25,11 +34,11 @@ Browser (React/Vite)
 
 | Container | Image | Host Port | Purpose |
 |---|---|---|---|
-| `chess_frontend` | `nginx:alpine` | **8001** | Serves React SPA; proxies `/auth` and `/games` to backend |
-| `chess_backend` | `node:20-slim` | **8000** | REST API — auth, game CRUD, job dispatch |
-| `chess_worker` | `node:20-slim` | — | BullMQ worker; runs Stockfish per game |
-| `chess_postgres` | `postgres:16-alpine` | 7432 | Persistent game + analysis storage |
-| `chess_redis` | `redis:7-alpine` | 7379 | BullMQ job queue broker |
+| `chess_frontend` | `nginx:alpine` | **8001** | Serves React SPA; proxies all API routes to backend |
+| `chess_backend` | `node:20-slim` | **8000** | REST API + Socket.IO — auth, game CRUD, live games, puzzles, tutorials, AI explanations |
+| `chess_worker` | `node:20-slim` | — | BullMQ worker; runs Stockfish + LLM explanation pipeline per game |
+| `chess_postgres` | `postgres:16-alpine` | 7432 | Persistent game, analysis, puzzle, live-game, and AI explanation storage |
+| `chess_redis` | `redis:7-alpine` | 7379 | BullMQ job queue broker + Socket.IO adapter |
 
 ---
 
@@ -41,16 +50,20 @@ chessplatform/
 ├── .env.example
 ├── ARCHITECTURE.md
 ├── USAGE.md
+├── DEPLOYMENT.md
 │
 ├── backend/
 │   ├── Dockerfile              # API server image (multi-stage)
 │   ├── Dockerfile.worker       # Analysis worker image (multi-stage)
 │   ├── db/
-│   │   └── schema.sql          # PostgreSQL DDL (auto-applied on first boot)
+│   │   ├── schema.sql                  # Core DDL (users, games, analysis, live_games, puzzles)
+│   │   ├── puzzle_migration.sql        # Puzzle table DDL
+│   │   └── ai_explanation_migration.sql# AI explanation tables DDL
 │   ├── scripts/
-│   │   └── seed.ts             # Sample-data seeder
+│   │   ├── seed.ts             # Sample-data seeder (users + classic games)
+│   │   └── seed_puzzles.ts     # Puzzle bank seeder
 │   └── src/
-│       ├── server.ts           # Entry point — binds HTTP server
+│       ├── server.ts           # Entry point — binds HTTP + Socket.IO server
 │       ├── app.ts              # Express app factory (middleware, routes)
 │       ├── config/
 │       │   ├── database.ts     # pg.Pool singleton
@@ -58,7 +71,10 @@ chessplatform/
 │       │   └── redis.ts        # IORedis client + plain opts for BullMQ
 │       ├── controllers/
 │       │   ├── auth.controller.ts
-│       │   └── games.controller.ts
+│       │   ├── games.controller.ts
+│       │   ├── puzzle.controller.ts
+│       │   ├── tutorial.controller.ts
+│       │   └── explanation.controller.ts
 │       ├── middleware/
 │       │   ├── auth.middleware.ts       # JWT verification
 │       │   ├── error.middleware.ts      # Centralised error handler
@@ -68,15 +84,33 @@ chessplatform/
 │       ├── repositories/
 │       │   ├── user.repository.ts
 │       │   ├── game.repository.ts
-│       │   └── analysis.repository.ts
+│       │   ├── liveGame.repository.ts
+│       │   ├── analysis.repository.ts
+│       │   └── explanation.repository.ts
 │       ├── routes/
 │       │   ├── auth.routes.ts
-│       │   └── games.routes.ts
+│       │   ├── games.routes.ts
+│       │   ├── live.routes.ts
+│       │   ├── puzzle.routes.ts
+│       │   ├── tutorial.routes.ts
+│       │   └── explanation.routes.ts
 │       ├── services/
 │       │   ├── auth.service.ts         # bcrypt + JWT logic
 │       │   ├── games.service.ts        # Game CRUD orchestration
 │       │   ├── analysis.service.ts     # PGN replay + Stockfish pipeline
-│       │   └── engine.service.ts       # Stockfish UCI process pool
+│       │   ├── engine.service.ts       # Stockfish UCI process pool
+│       │   ├── liveGame.service.ts     # Real-time game state machine
+│       │   ├── matchmaking.service.ts  # ELO-based pairing queue
+│       │   ├── elo.service.ts          # ELO rating calculation
+│       │   ├── puzzle.service.ts       # Puzzle delivery + validation
+│       │   ├── tutorial.service.ts     # Tutorial scenario engine
+│       │   ├── explanation.service.ts  # LLM provider abstraction
+│       │   ├── featureExtraction.service.ts # Chess position feature extraction
+│       │   ├── gameSummary.service.ts  # Per-game AI coaching summary
+│       │   └── aiExplanation.orchestrator.ts# Orchestrates LLM explanation pipeline
+│       ├── socket/
+│       │   ├── index.ts                # Socket.IO server setup + namespace config
+│       │   └── gameHandlers.ts         # Real-time game event handlers
 │       ├── types/
 │       │   └── index.ts                # Shared domain types
 │       ├── utils/
@@ -88,23 +122,31 @@ chessplatform/
 │
 └── frontend/
     ├── Dockerfile              # React build → nginx:alpine
-    ├── nginx.conf              # SPA fallback + API proxy
+    ├── nginx.conf              # SPA fallback + API proxy (all routes)
     ├── vite.config.ts
     └── src/
-        ├── App.tsx             # Router + query-client setup
+        ├── App.tsx             # Router + query-client setup + theme initialisation
         ├── main.tsx
         ├── services/
-        │   └── api.ts          # Axios instance with auth interceptor
+        │   ├── api.ts          # Axios instance with auth interceptor
+        │   └── socket.ts       # Socket.IO client singleton
         ├── store/
-        │   └── authStore.ts    # Zustand auth state
+        │   ├── authStore.ts        # Zustand auth state
+        │   ├── boardThemeStore.ts  # Board colour-theme preference (persisted)
+        │   ├── liveGameStore.ts    # Live game real-time state
+        │   └── uiThemeStore.ts     # Dark / light / system UI theme (persisted)
         ├── types/
         │   └── index.ts
         └── components/
             ├── auth/           # Login, Register
-            ├── common/         # Navbar, ProtectedRoute
+            ├── common/         # Navbar (with theme switcher), ProtectedRoute
             ├── dashboard/      # Dashboard (game list overview)
-            ├── game/           # GameList, GameUpload, GameView
-            └── analysis/       # ChessBoard, EvaluationBar, MoveList, AnalysisSummary
+            ├── game/           # GameList, GameUpload, GameView (board + analysis)
+            ├── analysis/       # ChessBoard, EvaluationBar, MoveList, AnalysisSummary,
+            │                   # AnalysisProgressBar, ExplanationPanel, AISummaryCard
+            ├── live/           # LiveBoard, PlayerClock, GameOverModal, MatchmakingLobby
+            ├── puzzle/         # PuzzlePage (AIPuzzleExplainer embedded)
+            └── tutorial/       # TutorialPage, PositionSetupBoard
 ```
 
 ---
@@ -144,6 +186,29 @@ chessplatform/
 | `label` | VARCHAR(30) | One of the seven labels below |
 | `best_move` | VARCHAR(20) | Stockfish top choice in UCI notation |
 | `explanation` | TEXT | Optional narrative |
+| `created_at` | TIMESTAMPTZ | |
+
+### `live_games`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `white_id` | UUID FK → users | |
+| `black_id` | UUID FK → users | |
+| `pgn` | TEXT | PGN of completed game |
+| `result` | VARCHAR(10) | `1-0`, `0-1`, `1/2-1/2` |
+| `status` | VARCHAR(20) | `active`, `completed`, `abandoned` |
+| `time_control` | INTEGER | Seconds per side |
+| `created_at` | TIMESTAMPTZ | |
+| `updated_at` | TIMESTAMPTZ | |
+
+### `puzzles`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `fen` | TEXT | Starting position FEN |
+| `moves` | TEXT | Solution move sequence (UCI, space-separated) |
+| `rating` | INTEGER | Lichess puzzle rating |
+| `themes` | TEXT[] | Tactical themes (fork, pin, …) |
 | `created_at` | TIMESTAMPTZ | |
 
 ---
@@ -204,6 +269,90 @@ The engine service maintains a **pool of N Stockfish processes** (`ENGINE_MAX_CO
 
 ---
 
+## Theme System
+
+### UI Theme (`uiThemeStore.ts`)
+- Three modes: **dark** (default), **light**, **system** (follows OS `prefers-color-scheme`)
+- Stored in `localStorage` and rehydrated on mount
+- Applied by setting `data-theme="light"` on `<html>` — components use CSS custom properties
+- Navbar contains the toggle button cycling through modes
+
+### Board Theme (`boardThemeStore.ts`)
+- Separate store for chessboard square/piece colours (e.g. green, blue, wood)
+- Persisted independently from the UI theme
+
+---
+
+## Live Multiplayer
+
+```
+Client A                     Socket.IO Server (backend)                 Client B
+   │                                  │                                    │
+   │──── socket.emit('findMatch') ───►│                                    │
+   │                                  │── matchmaking.service ────────────►│
+   │◄─── socket.emit('matchFound') ───│◄───────────────────────────────────│
+   │                                  │                                    │
+   │── socket.emit('move', {from,to}) ►│                                   │
+   │                                  │── liveGame.service.applyMove() ───►│
+   │◄─────────────── socket.emit('opponentMove', ...) ────────────────────►│
+   │                                  │                                    │
+   │◄─────────────── socket.emit('gameOver', {result, reason}) ───────────►│
+```
+
+- **Matchmaking**: `matchmaking.service.ts` maintains an ELO-based pairing queue in Redis
+- **Game state**: `liveGame.service.ts` manages the game clock and validates moves via chess.js
+- **ELO updates**: `elo.service.ts` applies K-factor based Elo adjustment after each rated game
+- **Persistence**: completed live games stored via `liveGame.repository.ts`
+- **Components**: `MatchmakingLobby` → `LiveBoard` + `PlayerClock` → `GameOverModal`
+
+---
+
+## Puzzle & Tutorial Systems
+
+### Puzzles (`puzzle.service.ts`)
+- Puzzles stored in the `puzzles` table with a FEN start position and a solution move sequence
+- `GET /puzzles/next` returns the next unsolved puzzle for the authenticated user
+- Server validates each submitted move against the solution; engine hints available on request
+- User stats tracked (attempted, solved, streak) and displayed in `PuzzlePage`
+- `AIPuzzleExplainer` component requests AI explanation for each puzzle position via the explanation pipeline
+
+### Tutorial (`tutorial.service.ts`)
+- Scenario-based lessons with a starting FEN and an expected principal variation
+- `PositionSetupBoard` renders the initial position; the student makes moves
+- `POST /tutorial/move` validates the student move and returns Stockfish's reply
+- `POST /tutorial/hint` returns the engine's top suggestion for the current position
+- `POST /tutorial/engine-first-move` initiates the engine's opening move for black-side lessons
+
+---
+
+## Board Arrow Visualisation
+
+The analysis `ChessBoard.tsx` component renders two layers of arrows over the board to illustrate the quality of each move:
+
+### Player Move Arrow
+- **Colour**: derived from the move label (`LABEL_COLOR` map):
+  - `best`/`excellent` → green (`#22c55e`)
+  - `good` → grey (`#94a3b8`)
+  - `inaccuracy` → yellow (`#eab308`)
+  - `mistake` → orange (`#f97316`)
+  - `blunder`/`missed_win` → red (`#ef4444`)
+- **Renderer**: react-chessboard v4 `customArrows` prop (solid arrow)
+- **Thinning**: scoped `<style>` tag applies `transform: scaleY(0.55)` to v4's internal SVG `<rect>` elements
+
+### Opponent Best-Response Arrow (Blunder Overlay)
+- Shown only when the displayed move is a `blunder`, `mistake`, `inaccuracy`, or `missed_win`
+- Sourced from: `nextRow.best_move` (Stockfish UCI stored in the analysis table for the following ply), falling back to `getMoveSquares()` if not available
+- **Colour**: cyan (`#06b6d4`)
+- **Style**: custom `<svg>` overlay with `strokeDasharray` dashed line + solid arrowhead
+- `squareToXY()` helper maps square names to pixel coordinates accounting for board orientation
+
+### Hover Preview
+- Hovering a row in `MoveList` calls `onHoverMove(idx)` which sets `hoveredMoveIdx` state in `GameView`
+- The board temporarily shows the position and arrows for the hovered move without updating `currentMoveIndex`
+- Mouse-leave restores the committed position
+
+---
+
 ## Key Technology Choices
 
 | Concern | Choice | Reason |
@@ -215,6 +364,8 @@ The engine service maintains a **pool of N Stockfish processes** (`ENGINE_MAX_CO
 | Frontend state | Zustand + React Query | Minimal boilerplate; server-state caching |
 | Build | Vite + tsc | Fast HMR in dev; strict type checking |
 | Container | Docker multi-stage | Minimal runtime image; BuildKit npm cache |
+| Chessboard | react-chessboard v4.6.1 | v5 requires React 19 (`React.use()`); v4 stable on React 18 |
+| Real-time | Socket.IO | WebSocket with fallback; rooms for live game isolation |
 
 ---
 

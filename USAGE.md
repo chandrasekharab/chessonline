@@ -58,6 +58,20 @@ Log in with any seed credential above, or register a new account.
 
 ## Using the Web Interface
 
+### Switching Themes
+
+Click the theme icon in the top-right of the **Navbar** to cycle through:
+
+| Mode | Behaviour |
+|---|---|
+| **Dark** *(default)* | Dark background, light text |
+| **Light** | Light background, dark text |
+| **System** | Follows your OS `prefers-color-scheme` setting |
+
+Your choice is saved to `localStorage` and restored on next visit. You can also change the **board colour theme** (square and piece set) from the same menu.
+
+---
+
 ### Uploading a Game
 
 1. Click **Upload Game** in the dashboard.  
@@ -87,7 +101,51 @@ Log in with any seed credential above, or register a new account.
 | 🟣 Purple | `missed_win` | Had ≥ +5 pawns, dropped to < +2 pawns |
 
 - Click any move in the list to jump the board to that position.
+- **Hover preview**: hovering over any move in the list temporarily shows that position on the board (without committing to it). Mouse-leave restores your current position.
+- **Board arrows**: when you navigate to a move, two arrow layers appear:
+  - A **solid coloured arrow** (matching the move label colour) shows the move that was played.
+  - A **dashed cyan arrow** appears for blunders, mistakes, inaccuracies, and missed wins — it shows Stockfish's recommended best response for the opponent, i.e. the engine line from `best_move` in the following ply.
 - The **Analysis Summary** panel shows per-player blunder/mistake/inaccuracy totals and average centipawn loss.
+- The **AI Coach** panel (if `AI_EXPLANATIONS_ENABLED=true`) shows an LLM-generated explanation for each bad move, personalised by rating tier. Click **Ask AI** on any move to request an explanation on demand.
+
+---
+
+### Live Multiplayer
+
+1. Click **Play Live** in the Navbar or Dashboard.  
+2. Select a **time control** (e.g. 5+0 Blitz, 10+0 Rapid) and click **Find Match**.  
+3. The lobby displays your ELO rating while the server searches for an opponent with a similar rating.  
+4. Once matched, the **Live Board** appears. Make moves by clicking or dragging pieces.  
+5. Player clocks count down independently; flagging (running out of time) is a loss.  
+6. A **Game Over** modal shows the result, final position, and updated ELO immediately after the game ends.  
+7. Completed live games are saved to your history and can be viewed under **Live Games** → individual game page.
+
+---
+
+### Puzzle Training
+
+1. Click **Puzzles** in the Navbar.  
+2. The server selects the next unsolved puzzle from the database, starting at a rating appropriate for your level.  
+3. You are shown a position — it is your turn to move. Find the winning combination!  
+4. Click or drag a piece to make a move:
+   - **Correct move**: the board plays the opponent's response and prompts for the next move in the sequence.
+   - **Wrong move**: the position resets to the start and you can try again.
+5. Click **Hint** to see the engine's top suggestion (this marks the puzzle as hinted in your stats).  
+6. Click **Resign** to skip and see the solution.  
+7. Your **stats** (attempted, solved, streak) are visible at the top of the page.  
+8. After solving a puzzle, the **AI Explainer** panel can show an LLM explanation of the key tactical idea.
+
+---
+
+### Tutorial
+
+1. Click **Tutorial** in the Navbar.  
+2. Choose a lesson from the list (e.g. *Italian Game*, *King and Pawn Endgame*).  
+3. The board is set up to the lesson's starting position via `PositionSetupBoard`.  
+4. Follow the on-screen instructions and make the recommended moves:
+   - The server validates your move against the expected principal variation.
+   - Stockfish automatically plays the engine's response.  
+5. Click **Hint** at any time to see the best move for the current position.
 
 ---
 
@@ -240,6 +298,66 @@ No auth required. Returns `{ "status": "ok", "env": "production" }`.
 
 ---
 
+### Live Games
+
+All `/live` endpoints require `Authorization: Bearer <jwt>`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/live/history` | All completed live games for the authenticated user |
+| GET | `/live/:id` | Single live game details + PGN |
+| GET | `/live/active/mine` | Currently active (in-progress) game, if any |
+
+Live game actions (start, move, resign, flag) are performed via **Socket.IO events**, not REST.
+
+---
+
+### Puzzles
+
+All `/puzzles` endpoints require `Authorization: Bearer <jwt>`.
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| GET | `/puzzles/next` | — | Next unsolved puzzle for the user |
+| GET | `/puzzles/stats` | — | User puzzle statistics (attempted, solved, streak) |
+| POST | `/puzzles/:id/move` | `{ move: "e2e4" }` | Submit a move (UCI); returns `{ correct, done, nextMove }` |
+| POST | `/puzzles/:id/resign` | — | Skip puzzle and reveal solution |
+
+---
+
+### Tutorial
+
+All `/tutorial` endpoints require `Authorization: Bearer <jwt>`.
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| POST | `/tutorial/move` | `{ fen, move, lessonId }` | Validate player move; returns engine response move |
+| POST | `/tutorial/hint` | `{ fen }` | Get Stockfish's best move suggestion |
+| POST | `/tutorial/engine-first-move` | `{ fen }` | Get engine's opening move (for black-side lessons) |
+
+---
+
+### AI Explanations
+
+All `/explanations` endpoints require `Authorization: Bearer <jwt>`.  
+These endpoints are only functional when `AI_EXPLANATIONS_ENABLED=true` on the backend.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/explanations/games/:gameId/moves/:moveNumber` | Request LLM explanation for a specific move (cached after first call) |
+| GET | `/explanations/games/:gameId/summary` | Get or generate the AI-coaching summary for a completed game |
+| GET | `/explanations/games/:gameId/all` | All cached AI explanations for a game |
+| GET | `/explanations/me/patterns` | Aggregated mistake patterns / weaknesses for the user |
+| GET | `/explanations/me/token-usage` | LLM token consumption statistics for cost monitoring |
+
+**Example — request a move explanation:**
+```bash
+curl -s -X POST http://localhost:8000/explanations/games/$GAME_ID/moves/15 \
+  -H "Authorization: Bearer $TOKEN" | jq .explanation
+```
+
+---
+
 ## Environment Variables
 
 ### Backend (`backend/.env`)
@@ -259,6 +377,14 @@ No auth required. Returns `{ "status": "ok", "env": "production" }`.
 | `RATE_LIMIT_MAX_REQUESTS` | `100` | Requests per window (global) |
 | `ANALYSIS_RATE_LIMIT_MAX` | `10` | Analysis jobs per window per IP |
 | `CORS_ORIGIN` | `http://localhost:7001` | Allowed CORS origin |
+| `AI_EXPLANATIONS_ENABLED` | `false` | Master toggle for LLM explanation pipeline |
+| `LLM_PROVIDER` | `openai` | `openai` \| `anthropic` \| `ollama` \| `custom` |
+| `LLM_MODEL` | `gpt-4o-mini` | LLM model name |
+| `LLM_BASE_URL` | *(empty)* | Custom OpenAI-compatible endpoint |
+| `OPENAI_API_KEY` | *(empty)* | Required for OpenAI provider |
+| `ANTHROPIC_API_KEY` | *(empty)* | Required for Anthropic provider |
+| `EXPLANATION_MIN_DROP_CP` | `100` | Minimum eval drop (cp) to generate explanation |
+| `LLM_MAX_TOKENS` | `300` | Max tokens per move explanation |
 
 ### Frontend (`frontend/.env`)
 
@@ -341,3 +467,6 @@ DOCKER_BUILDKIT=1 docker compose up --build backend -d
 | `Invalid PGN` error | Validate your PGN at [lichess.org/paste](https://lichess.org/paste) |
 | Frontend shows blank page | Check browser console; nginx must proxy successfully to `http://backend:7000` |
 | Slow first build | The BuildKit npm cache is cold on first run. Subsequent builds reuse it. |
+| Live game not connecting | Check that WebSocket upgrade is not blocked by a proxy; Socket.IO falls back to long-polling if WebSocket fails. |
+| AI explanations not appearing | Ensure `AI_EXPLANATIONS_ENABLED=true` and the correct `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` is set in `backend/.env`. |
+| Puzzle page shows no puzzles | Run the puzzle seeder: `docker compose exec backend npx ts-node --skip-project --compiler-options '{"module":"CommonJS","moduleResolution":"node"}' scripts/seed_puzzles.ts` |

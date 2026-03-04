@@ -1,6 +1,6 @@
 # Chess Insight Engine — Deployment Plan
 
-> Last updated: 2026-03-03  
+> Last updated: 2026-07-01  
 > Git remote: `https://github.com/chandrasekharab/chessonline`
 
 ---
@@ -25,30 +25,31 @@
 ## 1. Architecture Overview
 
 ```
-                  ┌─────────────────────────────────────┐
-Internet ─HTTPS──►│  nginx (chess_frontend :443/:80)    │
-                  │  • serves React SPA (static)         │
-                  │  • reverse-proxy API routes          │
-                  └──────┬──────────────┬────────────────┘
-                         │              │
-               /auth /games /live    /socket.io/
-               /health               (WebSocket upgrade)
-                         │              │
-                  ┌──────▼──────────────▼──────────────┐
-                  │  Express API  (chess_backend :7000) │
-                  │  + Socket.IO multiplayer server     │
-                  └───────────┬────────────────────────┘
-                              │
-               ┌──────────────┴──────────────┐
-               ▼                             ▼
-      PostgreSQL 16                      Redis 7
-    (chess_postgres)                  (chess_redis)
-                                           │
-                                  BullMQ analysis queue
-                                           │
-                                           ▼
-                              Analysis Worker (chess_worker)
-                              node:20-slim + Stockfish UCI
+                  ┌─────────────────────────────────────────────────────┐
+Internet ─HTTPS──►│  nginx (chess_frontend :443/:80)                    │
+                  │  • serves React SPA (static)                         │
+                  │  • reverse-proxy API routes                          │
+                  └──────┬───────────────────────────┬───────────────────┘
+                         │                           │
+          /auth /games /live /puzzles            /socket.io/
+          /tutorial /explanations /health        (WebSocket upgrade)
+                         │                           │
+                  ┌──────▼───────────────────────────▼──────────────────┐
+                  │  Express API  (chess_backend :7000)                  │
+                  │  + Socket.IO live multiplayer server                 │
+                  └───────────┬────────────────────────┬────────────────┘
+                              │                        │
+               ┌──────────────┴──┐                  LLM Provider
+               ▼                 ▼                 (OpenAI / Ollama)
+      PostgreSQL 16          Redis 7
+    (chess_postgres)       (chess_redis)
+                                │
+                       BullMQ analysis queue
+                                │
+                                ▼
+                   Analysis Worker (chess_worker)
+                   node:20-slim + Stockfish UCI
+                   + AI explanation pipeline
 ```
 
 ---
@@ -87,6 +88,7 @@ Internet ─HTTPS──►│  nginx (chess_frontend :443/:80)    │
 - [ ] `.env` exists and all values are set (copy from `.env.example`)
 - [ ] `docker compose config` succeeds (no invalid references)
 - [ ] Firewall allows 80, 443 in; blocks 7432, 7379, 8000
+- [ ] If enabling AI explanations: set `AI_EXPLANATIONS_ENABLED=true`, `LLM_PROVIDER`, and the corresponding API key; run the `ai_explanation_migration.sql` migration
 
 ---
 
@@ -108,6 +110,16 @@ CORS_ORIGIN=https://yourdomain.com
 # ── Optional tuning ─────────────────────────────────────────────────────────
 ENGINE_DEPTH=18          # Stockfish search depth (higher = slower, stronger)
 ENGINE_MAX_CONCURRENT=2  # Max simultaneous Stockfish processes per worker
+
+# ── AI Explanations (optional) ──────────────────────────────────────────────
+AI_EXPLANATIONS_ENABLED=false   # Set to true to enable LLM move explanations
+LLM_PROVIDER=openai             # openai | anthropic | ollama | custom
+LLM_MODEL=gpt-4o-mini           # Any compatible model name
+LLM_BASE_URL=                   # Custom OpenAI-compatible base URL (optional)
+OPENAI_API_KEY=                 # Required if LLM_PROVIDER=openai
+ANTHROPIC_API_KEY=              # Required if LLM_PROVIDER=anthropic
+EXPLANATION_MIN_DROP_CP=100     # Min eval drop to request an explanation
+LLM_MAX_TOKENS=300              # Max tokens per explanation response
 ```
 
 > In production the `DATABASE_URL` and `REDIS_URL` in `docker-compose.yml` reference the internal service hostnames (`postgres`, `redis`) and do NOT need `.env` overrides unless you change `POSTGRES_USER`/`POSTGRES_PASSWORD`.
@@ -254,7 +266,7 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    location ~ ^/(auth|games|live|health) {
+    location ~ ^/(auth|games|live|puzzles|tutorial|explanations|health) {
         proxy_pass http://backend:7000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -298,7 +310,19 @@ Point your domain to Cloudflare, enable the orange-cloud proxy, set SSL mode to 
 ### Schema (auto-applied)
 `backend/db/schema.sql` is mounted into the postgres container as an init script. It runs automatically on **first boot** if the data volume is empty.
 
-To re-apply after schema changes on an existing deployment:
+Additional migration files (run manually after the first boot if upgrading an existing deployment):
+
+```bash
+# Apply puzzle table schema
+docker compose exec postgres psql -U chess_user -d chess_insight \
+  -f /docker-entrypoint-initdb.d/puzzle_migration.sql
+
+# Apply AI explanation tables (required if AI_EXPLANATIONS_ENABLED=true)
+docker compose exec postgres psql -U chess_user -d chess_insight \
+  -f /docker-entrypoint-initdb.d/ai_explanation_migration.sql
+```
+
+To re-apply the core schema after changes on an existing deployment:
 ```bash
 docker compose exec postgres psql -U chess_user -d chess_insight \
   -f /docker-entrypoint-initdb.d/01_schema.sql
