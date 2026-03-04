@@ -486,29 +486,31 @@ export default function TutorialPage() {
           {/* Chessboard with resize grip */}
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <div style={{ borderRadius: 8, overflow: 'hidden', boxShadow: '0 4px 32px rgba(0,0,0,0.5)' }}>
-              <Chessboard
-                position={fen}
-                boardWidth={boardWidth}
-                boardOrientation={playerColor === 'black' ? 'black' : 'white'}
-                onPieceDrop={onDrop}
-                onSquareClick={onSquareClick}
-                isDraggablePiece={({ piece }) => {
-                  if (engineThinking || phase !== 'playing') return false;
-                  const isWhitePiece = piece[0] === 'w';
-                  return playerColor === 'white' ? isWhitePiece : !isWhitePiece;
-                }}
-                customSquareStyles={customSquareStyles}
-                customArrows={
-                  wrongMoveArrow
-                    ? [[wrongMoveArrow[0], wrongMoveArrow[1], 'rgb(34,197,94)']]
-                    : []
-                }
-                customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
-                customLightSquareStyle={{ backgroundColor: boardTheme.light }}
-                customBoardStyle={{ borderRadius: 0 }}
-                areArrowsAllowed
-                animationDuration={280}
-              />
+              <div style={{ width: boardWidth }}>
+                <Chessboard
+                  position={fen}
+                  boardWidth={boardWidth}
+                  boardOrientation={playerColor === 'black' ? 'black' : 'white'}
+                  onPieceDrop={onDrop}
+                  onSquareClick={onSquareClick}
+                  isDraggablePiece={({ piece }) => {
+                    if (engineThinking || phase !== 'playing') return false;
+                    const isWhitePiece = piece[0] === 'w';
+                    return playerColor === 'white' ? isWhitePiece : !isWhitePiece;
+                  }}
+                  customSquareStyles={customSquareStyles}
+                  customArrows={
+                    wrongMoveArrow
+                      ? [[wrongMoveArrow[0], wrongMoveArrow[1], 'rgb(34,197,94)']]
+                      : []
+                  }
+                  customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+                  customLightSquareStyle={{ backgroundColor: boardTheme.light }}
+                  customBoardStyle={{ borderRadius: 0 }}
+                  areArrowsAllowed
+                  animationDuration={280}
+                />
+              </div>
             </div>
             {/* Resize grip */}
             <div

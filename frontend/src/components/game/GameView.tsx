@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { Chess } from 'chess.js';
 import toast from 'react-hot-toast';
 import { gamesApi, getErrorMessage } from '../../services/api';
 import ChessBoardView from '../analysis/ChessBoard';
@@ -12,6 +13,25 @@ import AISummaryCard from '../analysis/AISummaryCard';
 import ExplanationPanel from '../analysis/ExplanationPanel';
 import AICoachChat from '../analysis/AICoachChat';
 import type { AnalysisMove } from '../../types';
+
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+function getMoveSquares(moves: AnalysisMove[], idx: number): { from: string; to: string } | undefined {
+  if (idx < 0 || idx >= moves.length) return undefined;
+  const prevFen = idx === 0 ? START_FEN : moves[idx - 1].fen;
+  try {
+    const ch = new Chess(prevFen);
+    const result = ch.move(moves[idx].move);
+    if (result) return { from: result.from, to: result.to };
+  } catch {}
+  return undefined;
+}
+
+/** Parse a UCI string (e.g. "d7d5" or "e7e8q") into from/to squares. */
+function uciSquares(uci: string): { from: string; to: string } | undefined {
+  if (!uci || uci.length < 4) return undefined;
+  return { from: uci.slice(0, 2), to: uci.slice(2, 4) };
+}
 import {
   ArrowLeft, PlayCircle, RefreshCw,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
@@ -38,6 +58,7 @@ export default function GameView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [currentMoveIndex, setCurrentMoveIndex] = useState<number>(-1);
+  const [hoveredMoveIdx, setHoveredMoveIdx] = useState<number | null>(null);
   const [boardWidth, setBoardWidth] = useState(420);
   const [aiOpen, setAiOpen] = useState(true);
   const [coachWidth, setCoachWidth] = useState<PanelWidth>(340);
@@ -107,8 +128,19 @@ export default function GameView() {
   }, [currentMoveIndex]);
 
   const currentMove = currentMoveIndex >= 0 ? moves[currentMoveIndex] : null;
-  let boardFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-  if (currentMove) boardFen = currentMove.fen;
+  // Hover preview: temporarily show a different move without navigating
+  const displayIdx  = hoveredMoveIdx ?? currentMoveIndex;
+  const displayMove = displayIdx >= 0 ? moves[displayIdx] : null;
+  let boardFen = START_FEN;
+  if (displayMove) boardFen = displayMove.fen;
+  const lastMove       = getMoveSquares(moves, displayIdx);
+  const highlightColor = displayMove ? (LABEL_COLOR[displayMove.label] ?? undefined) : undefined;
+  // Show the opponent's best engine response as a cyan arrow on bad moves
+  const BAD_LABELS = ['blunder', 'mistake', 'inaccuracy', 'missed_win'];
+  const nextRow = displayIdx + 1 < moves.length ? moves[displayIdx + 1] : undefined;
+  const opponentMove = displayMove && BAD_LABELS.includes(displayMove.label)
+    ? (nextRow?.best_move ? uciSquares(nextRow.best_move) : getMoveSquares(moves, displayIdx + 1))
+    : undefined;
   const currentEval = currentMove?.eval_after ?? (moves[0]?.eval_before ?? 0);
 
   const blunderCount    = moves.filter((m) => m.label === 'blunder').length;
@@ -203,7 +235,9 @@ export default function GameView() {
                 <EvaluationBar evalCp={currentEval} height={boardWidth} />
                 <ChessBoardView
                   fen={boardFen}
-                  lastMove={undefined}
+                  lastMove={lastMove}
+                  highlightColor={highlightColor}
+                  opponentMove={opponentMove}
                   orientation="white"
                   boardWidth={boardWidth}
                   onBoardWidthChange={setBoardWidth}
@@ -225,7 +259,7 @@ export default function GameView() {
               <p style={S.keyHint}>← → to navigate · Home / End to jump</p>
             </div>
             <div style={S.movePane}>
-              <MoveList moves={moves} currentIndex={currentMoveIndex} onSelect={goTo} />
+              <MoveList moves={moves} currentIndex={currentMoveIndex} onSelect={goTo} onHoverMove={setHoveredMoveIdx} />
             </div>
           </div>
         )}

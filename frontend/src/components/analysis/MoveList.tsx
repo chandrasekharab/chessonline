@@ -6,6 +6,7 @@ interface Props {
   moves: AnalysisMove[];
   currentIndex: number;
   onSelect: (index: number) => void;
+  onHoverMove?: (idx: number | null) => void;
 }
 
 const LABEL_ICONS: Record<MoveLabel, string> = {
@@ -15,7 +16,7 @@ const LABEL_ICONS: Record<MoveLabel, string> = {
 
 const LEGEND_LABELS: MoveLabel[] = ['blunder', 'mistake', 'inaccuracy', 'excellent', 'best'];
 
-export default function MoveList({ moves, currentIndex, onSelect }: Props) {
+export default function MoveList({ moves, currentIndex, onSelect, onHoverMove }: Props) {
   const activeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,6 +41,8 @@ export default function MoveList({ moves, currentIndex, onSelect }: Props) {
           ...(isActive ? styles.cellActive : {}),
         }}
         onClick={() => onSelect(index)}
+        onMouseEnter={() => onHoverMove?.(index)}
+        onMouseLeave={() => onHoverMove?.(null)}
         title={LABEL_DISPLAY[move.label]}
         role="button"
       >

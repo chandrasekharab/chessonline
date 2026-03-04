@@ -293,23 +293,25 @@ export default function PositionSetupBoard({ initialPlayerColor, onConfirm, onCa
             onDrop={onBoardDrop}
             onDragLeave={onBoardDragLeave}
           >
-            <Chessboard
-              position={position}
-              boardWidth={boardWidth}
-              boardOrientation={flipped ? 'black' : 'white'}
-              onSquareClick={onSquareClick}
-              onPieceDrop={onPieceDrop}
-              isDraggablePiece={() => !isDraggingFromTray.current}
-              customDarkSquareStyle={{ backgroundColor: theme.dark }}
-              customLightSquareStyle={{ backgroundColor: theme.light }}
-              customBoardStyle={{
-                borderRadius: 6,
-                boxShadow: brush ? '0 0 0 3px #3b82f6, 0 4px 24px rgba(0,0,0,0.5)' : '0 4px 24px rgba(0,0,0,0.5)',
-              }}
-              customSquareStyles={customSquareStyles}
-              areArrowsAllowed={false}
-              animationDuration={80}
-            />
+            <div style={{ width: boardWidth, height: boardWidth }}>
+              <Chessboard
+                position={position}
+                boardWidth={boardWidth}
+                boardOrientation={flipped ? 'black' : 'white'}
+                onSquareClick={onSquareClick}
+                onPieceDrop={onPieceDrop}
+                isDraggablePiece={() => !isDraggingFromTray.current}
+                customDarkSquareStyle={{ backgroundColor: theme.dark }}
+                customLightSquareStyle={{ backgroundColor: theme.light }}
+                customBoardStyle={{
+                  borderRadius: 6,
+                  boxShadow: brush ? '0 0 0 3px #3b82f6, 0 4px 24px rgba(0,0,0,0.5)' : '0 4px 24px rgba(0,0,0,0.5)',
+                }}
+                customSquareStyles={customSquareStyles}
+                areArrowsAllowed={false}
+                animationDuration={80}
+              />
+            </div>
           </div>
 
           {/* ── Right panel ── */}
