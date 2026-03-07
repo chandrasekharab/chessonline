@@ -10,6 +10,9 @@ import liveRoutes from './routes/live.routes';
 import tutorialRoutes from './routes/tutorial.routes';
 import puzzleRoutes from './routes/puzzle.routes';
 import explanationRoutes from './routes/explanation.routes';
+import teamRoutes from './routes/team.routes';
+import tournamentRoutes from './routes/tournament.routes';
+import leagueRoutes from './routes/league.routes';
 import { env } from './config/env';
 
 const app = express();
@@ -39,6 +42,9 @@ app.use('/live', liveRoutes);
 app.use('/tutorial', tutorialRoutes);
 app.use('/puzzles', puzzleRoutes);
 app.use('/explanations', explanationRoutes);
+app.use('/teams',        teamRoutes);
+app.use('/tournaments',  tournamentRoutes);
+app.use('/leagues',      leagueRoutes);
 
 // Error handling
 app.use(notFoundHandler);

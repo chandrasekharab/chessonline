@@ -228,6 +228,218 @@ export interface CoachChatContext {
   best_move?: string;
 }
 
+// ─── Team Mode Types ──────────────────────────────────────────────────────────
+
+export type TeamRole = 'captain' | 'coach' | 'player';
+
+export interface Team {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  description: string | null;
+  captain_id: string;
+  rating: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMember {
+  team_id: string;
+  user_id: string;
+  role: TeamRole;
+  joined_at: string;
+  email?: string;
+  rating?: number;
+}
+
+export interface TeamInvite {
+  id: string;
+  team_id: string;
+  token: string;
+  created_by: string;
+  expires_at: string;
+  max_uses: number | null;
+  use_count: number;
+  created_at: string;
+}
+
+// ─── Consultation Game Types ──────────────────────────────────────────────────
+
+export type ConsultationSide = 'white' | 'black';
+export type ConsultationStatus = 'waiting' | 'active' | 'completed' | 'abandoned';
+
+export interface ConsultationGame {
+  id: string;
+  white_player1_id: string | null;
+  white_player2_id: string | null;
+  black_player1_id: string | null;
+  black_player2_id: string | null;
+  white_team_id:    string | null;
+  black_team_id:    string | null;
+  white_executor_id: string | null;
+  black_executor_id: string | null;
+  fen: string;
+  move_history_json: LiveMove[];
+  status: ConsultationStatus;
+  winner: GameWinner | null;
+  termination: GameTermination;
+  time_control: TimeControl;
+  white_time_ms: number;
+  black_time_ms: number;
+  invite_code: string | null;
+}
+
+export interface ConsultationSuggestion {
+  id: string;
+  game_id: string;
+  suggested_by: string;
+  uci: string;
+  san: string | null;
+  votes: number;
+  voter_ids: string[];
+  move_number: number;
+  side: ConsultationSide;
+  executed: boolean;
+  created_at: string;
+  suggester_email?: string;
+}
+
+// Socket events
+export interface ConsultationMoveMadeEvent {
+  gameId: string;
+  move: LiveMove;
+  fen: string;
+  white_time_ms: number;
+  black_time_ms: number;
+  turn: 'w' | 'b';
+}
+
+export interface ConsultationSuggestionsEvent {
+  gameId: string;
+  moveNumber: number;
+  side: ConsultationSide;
+  suggestions: ConsultationSuggestion[];
+}
+
+export interface ConsultationChatMsgEvent {
+  gameId: string;
+  side: ConsultationSide;
+  senderId: string;
+  message: string;
+  timestamp: number;
+}
+
+export interface ConsultationGameOverEvent {
+  gameId: string;
+  winner: GameWinner | null;
+  termination: GameTermination;
+}
+
+// ─── Tournament Types ─────────────────────────────────────────────────────────
+
+export type TournamentFormat = 'swiss' | 'round_robin' | 'knockout';
+export type TournamentStatus = 'registration' | 'active' | 'completed' | 'cancelled';
+
+export interface Tournament {
+  id: string;
+  name: string;
+  description: string | null;
+  organizer_id: string;
+  league_id: string | null;
+  format: TournamentFormat;
+  team_size: number;
+  time_control: TimeControl;
+  status: TournamentStatus;
+  max_teams: number | null;
+  rounds_total: number;
+  rounds_done: number;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+}
+
+export interface TournamentTeamEntry {
+  tournament_id: string;
+  team_id: string;
+  seed: number | null;
+  match_points: number;
+  board_points: number;
+  registered_at: string;
+  team_name?: string;
+  team_rating?: number;
+}
+
+export interface TournamentRound {
+  id: string;
+  tournament_id: string;
+  round_number: number;
+  status: 'pending' | 'active' | 'completed';
+  created_at: string;
+}
+
+export interface TournamentMatch {
+  id: string;
+  round_id: string;
+  tournament_id: string;
+  team_a_id: string;
+  team_b_id: string;
+  team_a_points: number;
+  team_b_points: number;
+  status: 'pending' | 'active' | 'completed';
+  team_a_name?: string;
+  team_b_name?: string;
+}
+
+export interface TournamentBoard {
+  id: string;
+  match_id: string;
+  board_number: number;
+  white_user_id: string | null;
+  black_user_id: string | null;
+  live_game_id: string | null;
+  result: 'white' | 'black' | 'draw' | 'pending' | null;
+}
+
+// ─── League Types ─────────────────────────────────────────────────────────────
+
+export type LeagueVisibility = 'public' | 'private';
+export type LeagueStatus = 'active' | 'completed' | 'archived';
+
+export interface League {
+  id: string;
+  name: string;
+  description: string | null;
+  organizer_id: string;
+  visibility: LeagueVisibility;
+  invite_code: string | null;
+  season: number;
+  start_date: string | null;
+  end_date: string | null;
+  status: LeagueStatus;
+  created_at: string;
+}
+
+export interface LeagueTeamEntry {
+  league_id: string;
+  team_id: string;
+  approved: boolean;
+  joined_at: string;
+  team_name?: string;
+  team_rating?: number;
+}
+
+export interface LeagueAnnouncement {
+  id: string;
+  league_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  author_email?: string;
+}
+
 export interface CoachChatResponse {
   reply: string;
   model_used: string;

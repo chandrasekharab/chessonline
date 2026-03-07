@@ -2,6 +2,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LogOut, User, Swords, GraduationCap, Puzzle, Palette,
   LayoutDashboard, Menu, X, ChevronRight, Sun, Moon, Monitor,
+  Users, Trophy, Award, Users2,
 } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
@@ -10,9 +11,13 @@ import { useBoardThemeStore, BOARD_THEMES } from '../../store/boardThemeStore';
 import { useUIThemeStore, UITheme } from '../../store/uiThemeStore';
 
 const NAV_ITEMS = [
-  { to: '/play',     label: 'Play',     Icon: Swords,        color: '#60a5fa', desc: 'Play live games against other players' },
-  { to: '/tutorial', label: 'Tutorial', Icon: GraduationCap, color: '#34d399', desc: 'Learn chess concepts & openings' },
-  { to: '/puzzles',  label: 'Puzzles',  Icon: Puzzle,        color: '#fbbf24', desc: 'Sharpen tactics with daily puzzles' },
+  { to: '/play',         label: 'Play',         Icon: Swords,        color: '#60a5fa', desc: 'Play live games against other players' },
+  { to: '/tutorial',    label: 'Tutorial',    Icon: GraduationCap, color: '#34d399', desc: 'Learn chess concepts & openings' },
+  { to: '/puzzles',     label: 'Puzzles',     Icon: Puzzle,        color: '#fbbf24', desc: 'Sharpen tactics with daily puzzles' },
+  { to: '/teams',       label: 'Teams',       Icon: Users,         color: '#a78bfa', desc: 'Manage your teams' },
+  { to: '/tournaments', label: 'Tournaments', Icon: Trophy,        color: '#f59e0b', desc: 'Compete in team tournaments' },
+  { to: '/leagues',     label: 'Leagues',     Icon: Award,         color: '#34d399', desc: 'Join private club leagues' },
+  { to: '/consultation',label: 'Consultation',Icon: Users2,        color: '#f472b6', desc: 'Play 2v2 consultation chess' },
 ];
 
 const UI_THEMES: { value: UITheme; label: string; Icon: React.ElementType }[] = [

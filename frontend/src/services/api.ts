@@ -159,6 +159,122 @@ export const puzzleApi = {
     api.get<PuzzleStats>('/puzzles/stats'),
 };
 
+// ─── Teams ─────────────────────────────────────────────────────────────────
+
+import type {
+  Team, TeamMember, TeamInvite, TeamRole,
+  Tournament, TournamentTeamEntry, TournamentRound, TournamentMatch, TournamentBoard,
+  TournamentFormat, TournamentStatus,
+  League, LeagueTeamEntry, LeagueAnnouncement, LeagueVisibility,
+} from '../types';
+
+export const teamsApi = {
+  list: (q?: string, limit = 20, offset = 0) =>
+    api.get<{ teams: Team[]; total: number }>('/teams', { params: { q, limit, offset } }),
+
+  myTeams: () =>
+    api.get<{ teams: (Team & { role: TeamRole })[] }>('/teams/me'),
+
+  get: (id: string) =>
+    api.get<{ team: Team; members: TeamMember[] }>(`/teams/${id}`),
+
+  create: (data: { name: string; description?: string; logo_url?: string }) =>
+    api.post<{ team: Team }>('/teams', data),
+
+  update: (id: string, data: { name?: string; description?: string | null; logo_url?: string | null }) =>
+    api.patch<{ team: Team }>(`/teams/${id}`, data),
+
+  delete: (id: string) => api.delete(`/teams/${id}`),
+
+  addMember: (teamId: string, userId: string, role: TeamRole = 'player') =>
+    api.post<{ message: string }>(`/teams/${teamId}/members`, { user_id: userId, role }),
+
+  removeMember: (teamId: string, userId: string) =>
+    api.delete(`/teams/${teamId}/members/${userId}`),
+
+  setMemberRole: (teamId: string, userId: string, role: TeamRole) =>
+    api.patch(`/teams/${teamId}/members/${userId}/role`, { role }),
+
+  createInviteLink: (teamId: string, maxUses?: number) =>
+    api.post<{ invite: TeamInvite }>(`/teams/${teamId}/invites`, { max_uses: maxUses }),
+
+  getInvites: (teamId: string) =>
+    api.get<{ invites: TeamInvite[] }>(`/teams/${teamId}/invites`),
+
+  revokeInvite: (teamId: string, inviteId: string) =>
+    api.delete(`/teams/${teamId}/invites/${inviteId}`),
+
+  joinByInvite: (token: string) =>
+    api.post<{ team: Team }>(`/teams/join/${token}`),
+};
+
+// ─── Tournaments ───────────────────────────────────────────────────────────
+
+export const tournamentsApi = {
+  list: (params?: { status?: TournamentStatus; league_id?: string; limit?: number; offset?: number }) =>
+    api.get<{ tournaments: Tournament[]; total: number }>('/tournaments', { params }),
+
+  get: (id: string) =>
+    api.get<{ tournament: Tournament; standings: TournamentTeamEntry[]; rounds: TournamentRound[] }>(
+      `/tournaments/${id}`),
+
+  create: (data: {
+    name: string; description?: string; format: TournamentFormat; team_size?: number;
+    time_control?: string; max_teams?: number; rounds_total?: number;
+    start_date?: string; league_id?: string;
+  }) => api.post<{ tournament: Tournament }>('/tournaments', data),
+
+  registerTeam: (tournamentId: string, teamId: string) =>
+    api.post<{ entry: TournamentTeamEntry }>(`/tournaments/${tournamentId}/register`, { team_id: teamId }),
+
+  start: (id: string) =>
+    api.post<{ round: TournamentRound }>(`/tournaments/${id}/start`),
+
+  getRoundMatches: (roundId: string) =>
+    api.get<{ matches: TournamentMatch[] }>(`/tournaments/rounds/${roundId}/matches`),
+
+  getMatch: (matchId: string) =>
+    api.get<{ match: TournamentMatch; boards: TournamentBoard[] }>(`/tournaments/matches/${matchId}`),
+
+  submitBoardResult: (matchId: string, boardId: string, result: 'white' | 'black' | 'draw', liveGameId?: string) =>
+    api.post(`/tournaments/matches/${matchId}/boards/${boardId}/result`, { result, live_game_id: liveGameId }),
+};
+
+// ─── Leagues ───────────────────────────────────────────────────────────────
+
+export const leaguesApi = {
+  list: (params?: { visibility?: LeagueVisibility; limit?: number; offset?: number }) =>
+    api.get<{ leagues: League[]; total: number }>('/leagues', { params }),
+
+  get: (id: string) =>
+    api.get<{ league: League; teams: LeagueTeamEntry[]; announcements: LeagueAnnouncement[]; tournaments: { tournaments: Tournament[] } }>(
+      `/leagues/${id}`),
+
+  create: (data: { name: string; description?: string; visibility: LeagueVisibility; season?: number; start_date?: string; end_date?: string }) =>
+    api.post<{ league: League }>('/leagues', data),
+
+  update: (id: string, data: Record<string, unknown>) =>
+    api.patch<{ league: League }>(`/leagues/${id}`, data),
+
+  getStandings: (id: string) =>
+    api.get<{ standings: LeagueTeamEntry[] }>(`/leagues/${id}/standings`),
+
+  joinById: (leagueId: string, teamId: string, inviteCode?: string) =>
+    api.post<{ entry: LeagueTeamEntry }>(`/leagues/${leagueId}/join`, { team_id: teamId, invite_code: inviteCode }),
+
+  joinByCode: (code: string, teamId: string) =>
+    api.post<{ league: League }>(`/leagues/join/${code}`, { team_id: teamId }),
+
+  approveTeam: (leagueId: string, teamId: string) =>
+    api.post(`/leagues/${leagueId}/teams/${teamId}/approve`),
+
+  removeTeam: (leagueId: string, teamId: string) =>
+    api.delete(`/leagues/${leagueId}/teams/${teamId}`),
+
+  postAnnouncement: (leagueId: string, body: string) =>
+    api.post<{ announcement: LeagueAnnouncement }>(`/leagues/${leagueId}/announcements`, { body }),
+};
+
 // Helper: extract error message
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {

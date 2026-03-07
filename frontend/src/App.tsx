@@ -11,6 +11,10 @@ import MatchmakingLobby from './components/live/MatchmakingLobby';
 import TutorialPage from './components/tutorial/TutorialPage';
 import PuzzlePage from './components/puzzle/PuzzlePage';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import TeamPage from './components/team/TeamPage';
+import TournamentPage from './components/tournament/TournamentPage';
+import LeaguePage from './components/league/LeaguePage';
+import ConsultationBoard from './components/consultation/ConsultationBoard';
 
 export default function App() {
   const user = useAuthStore((s) => s.user);
@@ -42,6 +46,10 @@ export default function App() {
             <Route path="/play" element={<MatchmakingLobby />} />
             <Route path="/tutorial" element={<TutorialPage />} />
             <Route path="/puzzles" element={<PuzzlePage />} />
+            <Route path="/teams" element={<TeamPage />} />
+            <Route path="/tournaments" element={<TournamentPage />} />
+            <Route path="/leagues" element={<LeaguePage />} />
+            <Route path="/consultation/:id?" element={<ConsultationBoard />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

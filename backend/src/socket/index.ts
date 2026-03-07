@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { authService } from '../services/auth.service';
 import { logger } from '../utils/logger';
 import { registerGameHandlers } from './gameHandlers';
+import { registerConsultationHandlers } from './consultationHandlers';
 
 // Map socketId → userId for quick lookups
 export const socketUserMap = new Map<string, string>();
@@ -50,6 +51,7 @@ export function createSocketServer(httpServer: HTTPServer): SocketServer {
     userSocketMap.set(s.userId, s.id);
 
     registerGameHandlers(io, s);
+    registerConsultationHandlers(io, s);
 
     s.on('disconnect', () => {
       logger.info('Socket disconnected', { socketId: s.id, userId: s.userId });
